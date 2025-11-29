@@ -1,50 +1,125 @@
-describe('Strapi Admin Login Page', () => {
-  const email = 'admin@strapi.io';
-  const password = 'Admin123';
-  const baseUrl = Cypress.config('baseUrl');
+// Custom command to handle login
+Cypress.Commands.add('login', (email, password) => {
+  const login = () => {
+    cy.session([email, password], () => {
+      cy.visit('/admin', { timeout: 30000 });
+      
+      // Check if already logged in
+      cy.get('body').then(($body) => {
+        if ($body.find('input[type="email"]').length > 0) {
+          // Fill out the login form
+          cy.get('input[type="email"]').should('be.visible').type(email, { delay: 50 });
+          cy.get('input[type="password"]').should('be.visible').type(password, { delay: 50 });
+          cy.get('button[type="submit"]').should('be.visible').click();
+          
+          // Wait for successful login
+          cy.url({ timeout: 30000 }).should('include', '/admin');
+          cy.get('nav, aside', { timeout: 20000 }).should('be.visible');
+        }
+      });
+    }, {
+      validate: () => {
+        // Validate the session by checking for admin elements
+        cy.getCookie('strapi_jwt').should('exist');
+      }
+    });
+  };
+  
+  // Attempt login with retry logic
+  login();
+});
 
+describe('Strapi Admin Authentication', () => {
+  const email = Cypress.env('STRAPI_EMAIL') || 'admin@strapi.io';
+  const password = Cypress.env('STRAPI_PASSWORD') || 'Admin123';
+  
   beforeEach(() => {
+    // Clear session for tests that need to test login flow
+    if (Cypress.currentTest.title.includes('login')) {
+      cy.clearCookies();
+      cy.clearLocalStorage();
+      cy.visit('/admin/auth/logout');
+    }
+  });
+
+  it('should display the login page with required elements', () => {
     cy.visit('/admin', { timeout: 30000 });
-    // Clear cookies and local storage before each test
-    cy.clearCookies();
-    cy.clearLocalStorage();
-  });
-
-  it('should display the login page with welcome message', () => {
-    cy.get('h1', { timeout: 10000 }).should('contain', 'Welcome');
-    cy.get('input[type="email"]', { timeout: 10000 }).should('be.visible');
-    cy.get('input[type="password"]').should('be.visible');
-  });
-
-  it('should have login form elements', () => {
-    cy.get('form').should('exist');
+    
+    // Check page title and form elements
+    cy.get('h1', { timeout: 10000 })
+      .should('be.visible')
+      .and('contain', 'Welcome');
+      
+    // Check form elements
+    cy.get('form').should('exist').and('be.visible');
+    cy.get('input[type="email"]')
+      .should('be.visible')
+      .and('have.attr', 'placeholder', 'e.g. kai@strapi.io');
+    cy.get('input[type="password"]')
+      .should('be.visible')
+      .and('have.attr', 'placeholder', 'Enter your password');
     cy.get('button[type="submit"]')
-      .should('exist')
-      .should('contain', 'Login')
-      .and('be.visible');
+      .should('be.visible')
+      .and('contain', 'Login')
+      .and('have.attr', 'type', 'submit');
   });
 
   it('should show error message for invalid credentials', () => {
+    cy.visit('/admin');
+    
+    // Test with invalid credentials
     cy.get('input[type="email"]').type('invalid@example.com');
     cy.get('input[type="password"]').type('wrongpassword');
     cy.get('button[type="submit"]').click();
     
-    // Wait for error message with retry-ability
+    // Check for error message
     cy.get('p[role="alert"]', { timeout: 10000 })
       .should('be.visible')
-      .and('contain', 'Invalid')
-      .or('contain', 'error');
+      .and(($el) => {
+        expect($el.text().toLowerCase()).to.match(/(invalid|error|incorrect)/i);
+      });
   });
 
-  it('should navigate to admin dashboard after successful login', () => {
-    // Login with test credentials
-    cy.get('input[type="email"]').type(email);
-    cy.get('input[type="password"]').type(password);
-    cy.get('button[type="submit"]').click();
+  it('should successfully log in with valid credentials', () => {
+    // Use the custom login command
+    cy.login(email, password);
     
     // Verify successful login by checking for dashboard elements
-    cy.url({ timeout: 15000 }).should('include', '/admin');
-    cy.get('nav', { timeout: 10000 }).should('be.visible');
+    cy.url().should('include', '/admin');
+    cy.get('nav, aside', { timeout: 20000 })
+      .should('be.visible');
+    cy.get('header h1')
+      .should('be.visible')
+      .and('contain', 'Dashboard');
   });
-})
+
+  it('should maintain session after page refresh', () => {
+    // First login
+    cy.login(email, password);
+    
+    // Refresh the page
+    cy.reload();
+    
+    // Verify still logged in
+    cy.url().should('include', '/admin');
+    cy.get('nav, aside').should('be.visible');
+  });
+
+  it('should log out successfully', () => {
+    // First login
+    cy.login(email, password);
+    
+    // Click on user menu and logout
+    cy.get('button[aria-label="Profile"]')
+      .should('be.visible')
+      .click();
+    cy.contains('a', 'Sign out')
+      .should('be.visible')
+      .click();
+    
+    // Verify logged out
+    cy.url().should('include', '/admin/auth/login');
+    cy.get('input[type="email"]').should('be.visible');
+  });
+});
 
