@@ -1,24 +1,25 @@
-FROM node:18-alpine
+# Use Node.js LTS version (20.x) for better performance and security
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies for building native modules
+# Install build dependencies and required tools
 RUN apk add --no-cache python3 make g++
 
 # Copy package files
-COPY package*.json ./
+COPY package.json yarn.lock ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install only production dependencies
+RUN yarn install --production --frozen-lockfile
 
 # Copy application files
 COPY . .
 
-# Build Strapi application
-RUN npm run build
+# Build the application
+RUN yarn build
 
-# Expose Strapi port
+# Expose the Strapi port
 EXPOSE 1337
 
 # Set environment variables
@@ -28,8 +29,7 @@ ENV PORT=1337
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:1337/admin', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD wget --no-verbose --tries=1 --spider http://localhost:1337/_health || exit 1
 
-# Start Strapi
-CMD ["npm", "run", "start"]
-
+# Start the application
+CMD ["yarn", "start"]
