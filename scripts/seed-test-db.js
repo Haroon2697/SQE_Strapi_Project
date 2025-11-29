@@ -20,14 +20,14 @@ const createAdmin = async () => {
     });
 
     if (!adminExists) {
-      // Create admin user
+      // Create admin user with test credentials
       await strapi.db.query('admin::user').create({
         data: {
-          firstname: 'Test',
+          firstname: 'Admin',
           lastname: 'User',
-          email: 'test@example.com',
-          username: 'testadmin',
-          password: 'Test1234!',
+          email: 'admin@strapi.io',
+          username: 'admin',
+          password: 'Admin123',
           isActive: true,
           roles: [1] // Super Admin role
         }
