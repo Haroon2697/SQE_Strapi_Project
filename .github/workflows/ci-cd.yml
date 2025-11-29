@@ -66,8 +66,8 @@ jobs:
     - name: Lint
       run: npm run lint --if-present
 
-    - name: Run unit tests
-      run: npm test -- --ci --coverage
+    - name: Run tests
+      run: npm run test:ci
 
     - name: Build
       run: npm run build
