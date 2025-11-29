@@ -84,12 +84,14 @@ jobs:
       uses: cypress-io/github-action@v5
       with:
         build: npm run build
-        start: npm run develop
+        start: npm run start:ci
         wait-on: 'http://localhost:1337'
-        wait-on-timeout: 120
+        wait-on-timeout: 180
         browser: chrome
         config: "baseUrl=http://localhost:1337"
         config-file: cypress.config.js
+        record: false
+        quiet: false
         env: |
           NODE_ENV=test
           HOST=0.0.0.0
@@ -101,10 +103,7 @@ jobs:
           APP_KEYS=test_app_keys_12345,test_app_keys_67890
           TRANSFER_TOKEN_SALT=test_transfer_token_salt_12345
           STRAPI_TELEMETRY_DISABLED=true
-          # Additional Strapi environment variables
           STRAPI_ADMIN_BACKEND_URL=http://localhost:1337
-          STRAPI_TELEMETRY_DISABLED=true
-          # Increase Node.js memory limit
           NODE_OPTIONS=--max-old-space-size=4096
 
   deploy-staging:
