@@ -36,6 +36,14 @@ jobs:
       NODE_ENV: test
       HOST: 0.0.0.0
       PORT: 1337
+      # Security variables for Strapi
+      ADMIN_JWT_SECRET: test_admin_jwt_secret_12345
+      JWT_SECRET: test_jwt_secret_12345
+      API_TOKEN_SALT: test_api_token_salt_12345
+      APP_KEYS: test_app_keys_12345,test_app_keys_67890
+      TRANSFER_TOKEN_SALT: test_transfer_token_salt_12345
+      # Disable telemetry in test environment
+      STRAPI_TELEMETRY_DISABLED: true
 
     steps:
     - name: Checkout repository
@@ -82,6 +90,14 @@ jobs:
         env: |
           DATABASE_URL=postgresql://strapi:strapi@localhost:5432/strapi_test
           NODE_ENV=test
+          HOST=0.0.0.0
+          PORT=1337
+          ADMIN_JWT_SECRET=test_admin_jwt_secret_12345
+          JWT_SECRET=test_jwt_secret_12345
+          API_TOKEN_SALT=test_api_token_salt_12345
+          APP_KEYS=test_app_keys_12345,test_app_keys_67890
+          TRANSFER_TOKEN_SALT=test_transfer_token_salt_12345
+          STRAPI_TELEMETRY_DISABLED=true
 
   deploy-staging:
     name: Deploy to Staging
