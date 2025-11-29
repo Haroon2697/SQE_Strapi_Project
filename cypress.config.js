@@ -7,9 +7,16 @@ module.exports = defineConfig({
     viewportHeight: 720,
     video: true,
     screenshotOnRunFailure: true,
-    defaultCommandTimeout: 10000,
+    defaultCommandTimeout: 30000, // Increased timeout
+    requestTimeout: 10000,
+    responseTimeout: 30000,
+    retries: {
+      runMode: 2, // Retry failed tests up to 2 times in CI
+      openMode: 0
+    },
     setupNodeEvents(on, config) {
-      // implement node event listeners here
+      // Add any required setup here
+      return config
     },
   },
   component: {

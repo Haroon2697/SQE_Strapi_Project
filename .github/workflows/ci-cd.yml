@@ -86,18 +86,26 @@ jobs:
         build: npm run build
         start: npm run develop
         wait-on: 'http://localhost:1337'
+        wait-on-timeout: 120
         browser: chrome
+        config: "baseUrl=http://localhost:1337"
+        config-file: cypress.config.js
         env: |
-          DATABASE_URL=postgresql://strapi:strapi@localhost:5432/strapi_test
           NODE_ENV=test
           HOST=0.0.0.0
           PORT=1337
+          DATABASE_URL=postgresql://strapi:strapi@localhost:5432/strapi_test
           ADMIN_JWT_SECRET=test_admin_jwt_secret_12345
           JWT_SECRET=test_jwt_secret_12345
           API_TOKEN_SALT=test_api_token_salt_12345
           APP_KEYS=test_app_keys_12345,test_app_keys_67890
           TRANSFER_TOKEN_SALT=test_transfer_token_salt_12345
           STRAPI_TELEMETRY_DISABLED=true
+          # Additional Strapi environment variables
+          STRAPI_ADMIN_BACKEND_URL=http://localhost:1337
+          STRAPI_TELEMETRY_DISABLED=true
+          # Increase Node.js memory limit
+          NODE_OPTIONS=--max-old-space-size=4096
 
   deploy-staging:
     name: Deploy to Staging
