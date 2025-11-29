@@ -1,0 +1,122 @@
+name: Strapi CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "sqe-dev" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  DATABASE_CLIENT: postgres
+  DATABASE_NAME: strapi_test
+  DATABASE_USERNAME: strapi
+  DATABASE_PASSWORD: strapi
+  DATABASE_HOST: localhost
+  DATABASE_PORT: 5432
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: strapi
+          POSTGRES_PASSWORD: strapi
+          POSTGRES_DB: strapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci --legacy-peer-deps
+
+    - name: Lint
+      run: npm run lint --if-present
+
+    - name: Run unit tests
+      run: npm test -- --ci --coverage
+
+    - name: Build
+      run: npm run build
+
+    - name: Run E2E tests
+      uses: cypress-io/github-action@v5
+      with:
+        build: npm run build
+        start: npm run develop
+        wait-on: 'http://localhost:1337'
+        browser: chrome
+      env:
+        NODE_ENV: test
+        DATABASE_CLIENT: postgres
+        DATABASE_NAME: strapi_test
+        DATABASE_USERNAME: strapi
+        DATABASE_PASSWORD: strapi
+        DATABASE_HOST: localhost
+        DATABASE_PORT: 5432
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/sqe-dev'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME || 'your-dockerhub-username' }}
+        password: ${{ secrets.DOCKERHUB_TOKEN || 'your-dockerhub-token' }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME || 'your-dockerhub-username' }}/sqe-strapi:latest
+          ${{ secrets.DOCKERHUB_USERNAME || 'your-dockerhub-username' }}/sqe-strapi:${{ github.sha }}
+
+    - name: Deploy to Staging
+      run: |
+        echo "🚀 Deploying to staging environment..."
+        # Add your staging deployment commands here
+        # Example: kubectl apply -f k8s/staging.yaml
+
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Deploy to Production
+      run: |
+        echo "🚀 Deploying to production environment..."
+        # Add your production deployment commands here
+        # Example: kubectl apply -f k8s/production.yaml
