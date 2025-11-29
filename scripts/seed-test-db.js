@@ -1,6 +1,9 @@
 const path = require('path');
 const fs = require('fs');
-const { hash } = require('@strapi/plugin-users-permissions/server/utils/encryption');
+const { execSync } = require('child_process');
+
+// Load environment variables
+require('dotenv').config({ path: path.join(__dirname, '../.env.test') });
 
 // Ensure the database directory exists
 const dbDir = path.join(__dirname, '../.tmp');
@@ -8,97 +11,95 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-// Load environment variables
-require('dotenv').config({ path: path.join(__dirname, '../.env.test') });
-
-// Initialize Strapi
-const strapiFactory = require('@strapi/strapi');
-
-// Create a test admin user
-const createAdmin = async (strapi) => {
+// Simple function to run shell commands
+const runCommand = (command) => {
   try {
-    // Check if admin already exists
-    const adminExists = await strapi.db.query('admin::user').findOne({
-      where: { email: 'admin@strapi.io' }
-    });
-
-    if (!adminExists) {
-      // Hash the password
-      const hashedPassword = await hash('Admin123');
-      
-      // Create admin user with test credentials
-      await strapi.db.query('admin::user').create({
-        data: {
-          firstname: 'Admin',
-          lastname: 'User',
-          email: 'admin@strapi.io',
-          username: 'admin',
-          password: hashedPassword,
-          isActive: true,
-          roles: [1], // Super Admin role
-          registrationToken: null,
-          isActive: true
-        }
-      });
-      console.log('✅ Test admin user created successfully');
-    } else {
-      console.log('ℹ️ Test admin user already exists');
-    }
-    
+    console.log(`Running: ${command}`);
+    const output = execSync(command, { stdio: 'inherit' });
     return true;
   } catch (error) {
-    console.error('❌ Error creating test admin user:', error.message);
-    if (error.details) {
-      console.error('Error details:', error.details);
-    }
+    console.error(`❌ Command failed: ${command}`);
     throw error;
   }
 };
 
-// Run the seed
-const runSeed = async (strapi) => {
+// Create admin user using Strapi CLI
+const createAdminUser = async () => {
   try {
-    console.log('🌱 Starting database seed...');
-    await createAdmin(strapi);
-    console.log('✅ Database seed completed successfully');
-    return true;
+    // First, check if admin already exists by trying to get a JWT token
+    try {
+      const token = execSync(
+        'curl -X POST http://localhost:1337/admin/login \
+        -H "Content-Type: application/json" \
+        -d \'{"email":"admin@strapi.io","password":"Admin123"}\''
+      );
+      console.log('ℹ️ Admin user already exists');
+      return true;
+    } catch (e) {
+      // If we get here, the user doesn't exist or credentials are wrong
+      console.log('🌱 Creating admin user...');
+      
+      // Run the bootstrap command to create the first admin user
+      const cmd = `NODE_ENV=test npx strapi admin:create-user \
+        --email=admin@strapi.io \
+        --password=Admin123 \
+        --firstname=Admin \
+        --lastname=User`;
+      
+      runCommand(cmd);
+      console.log('✅ Admin user created successfully');
+      return true;
+    }
   } catch (error) {
-    console.error('❌ Error seeding database:', error.message);
+    console.error('❌ Error creating admin user:', error.message);
     throw error;
   }
 };
 
 // Main function
-const start = async () => {
+const main = async () => {
   if (process.env.NODE_ENV !== 'test') {
     console.error('❌ This script should only be run in test environment');
     process.exit(1);
   }
 
   try {
-    console.log('🚀 Starting Strapi for seeding...');
+    console.log('🚀 Starting database setup...');
     
-    // Initialize Strapi
-    const app = await strapiFactory({
-      appDir: path.join(__dirname, '..'),
-      distDir: path.join(__dirname, '../dist')
-    }).load();
+    // 1. Build the admin panel
+    console.log('🔨 Building admin panel...');
+    runCommand('NODE_ENV=test npm run build');
+    
+    // 2. Start Strapi in the background
+    console.log('🚀 Starting Strapi in the background...');
+    const strapiProcess = execSync(
+      'NODE_ENV=test npm run start:ci &',
+      { stdio: 'inherit', shell: true, detached: true }
+    );
 
-    // Start Strapi
-    await app.start();
+    // 3. Wait for Strapi to start
+    console.log('⏳ Waiting for Strapi to start...');
+    await new Promise(resolve => setTimeout(resolve, 10000));
     
-    // Run seed
-    await runSeed(app);
+    // 4. Create admin user
+    await createAdminUser();
     
-    // Stop Strapi
-    await app.stop();
-    console.log('👋 Strapi stopped');
+    // 5. Stop Strapi
+    console.log('🛑 Stopping Strapi...');
+    try {
+      execSync('pkill -f "strapi start"', { stdio: 'ignore' });
+    } catch (e) {
+      // Ignore if no process was found
+    }
+    
+    console.log('✅ Database setup completed successfully');
     process.exit(0);
+    
   } catch (error) {
-    console.error('❌ Failed to seed database:', error);
+    console.error('❌ Database setup failed:', error);
     process.exit(1);
   }
 };
 
-// Start the process
-start();
+// Run the main function
+main();
