@@ -138,11 +138,9 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies
-      working-directory: ./strapi-app  # Add this line
       run: npm ci
       
     - name: Run tests
-      working-directory: ./strapi-app  # Add this line
       run: npm test
 
   build:
