@@ -264,3 +264,4 @@ This project is for educational purposes as part of SQE coursework.
 
 **Note:** Remember to replace `YOUR_USERNAME` with your actual GitHub username in all configuration files.
 
+ 
