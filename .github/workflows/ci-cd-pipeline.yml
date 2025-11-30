@@ -107,11 +107,16 @@ jobs:
           STRAPI_TELEMETRY_DISABLED: true
         run: |
           mkdir -p .tmp
+          echo "Ensuring configs are copied before starting..."
+          node scripts/copy-configs.js
           echo "Starting Strapi in CI mode (using wrapper script for config handling)..."
           # Use wrapper script that handles config copying after dist cleanup
           npm run start:ci > strapi.log 2>&1 &
           STRAPI_PID=$!
           echo $STRAPI_PID > strapi.pid
+          # Give it a moment, then ensure configs are still there
+          sleep 2
+          node scripts/copy-configs.js || echo "Config copy check"
           echo "Strapi process started with PID: $STRAPI_PID"
           echo "Waiting for Strapi to be ready (this may take 60-90 seconds for first build)..."
           
@@ -190,11 +195,8 @@ jobs:
         run: |
           echo "Building Strapi admin panel (one-time setup)..."
           npm run build:ci
-      
-      - name: Copy Config Files to dist
-        run: |
-          echo "Ensuring config files are in dist/config..."
-          node scripts/copy-configs.js || echo "Config copy may have failed, but continuing..."
+          echo "Build complete, ensuring configs are in dist/config..."
+          node scripts/copy-configs.js
       
       - name: Start Strapi
         env:
