@@ -26,7 +26,6 @@ module.exports = defineConfig({
     
     // Test settings
     video: true,
-    videoUploadOnPasses: false,
     videoCompression: 32,           // Increased compression for smaller files
     screenshotOnRunFailure: true,
     trashAssetsBeforeRuns: true,
