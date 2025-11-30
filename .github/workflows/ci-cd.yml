@@ -91,18 +91,51 @@ jobs:
     - name: Run unit tests
       run: npm run test:ci
 
+    - name: Install dependencies
+      run: npm ci
+      working-directory: ./
+
+    - name: Build Strapi
+      run: npm run build
+      working-directory: ./
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
+
+    - name: Start Strapi in background
+      run: |
+        nohup npm run start:ci > strapi.log 2>&1 & 
+        echo $! > strapi.pid
+        echo "Strapi starting in background (PID: $(cat strapi.pid))"
+      working-directory: ./
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
+        HOST: 0.0.0.0
+        PORT: 1337
+        ADMIN_JWT_SECRET: test_admin_jwt_secret_12345
+        JWT_SECRET: test_jwt_secret_12345
+        API_TOKEN_SALT: test_api_token_salt_12345
+        APP_KEYS: test_app_keys_12345,test_app_keys_67890
+        TRANSFER_TOKEN_SALT: test_transfer_token_salt_12345
+        STRAPI_TELEMETRY_DISABLED: true
+
+    - name: Wait for Strapi to be ready
+      run: |
+        echo "Waiting for Strapi to start..."
+        timeout 180 bash -c 'until curl -s http://localhost:1337/admin > /dev/null; do
+          echo "Waiting for Strapi..."
+          sleep 5
+        done'
+        echo "Strapi is ready!"
+
     - name: Run E2E tests
       uses: cypress-io/github-action@v5
       env:
-        # Cypress-specific environment variables
         CYPRESS_BASE_URL: http://localhost:1337
         CYPRESS_STRAPI_EMAIL: admin@strapi.io
         CYPRESS_STRAPI_PASSWORD: Admin123
-        
-        # Database configuration
         DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
-        
-        # Strapi environment variables
         NODE_ENV: test
         HOST: 0.0.0.0
         PORT: 1337
@@ -112,25 +145,26 @@ jobs:
         APP_KEYS: test_app_keys_12345,test_app_keys_67890
         TRANSFER_TOKEN_SALT: test_transfer_token_salt_12345
         STRAPI_TELEMETRY_DISABLED: true
-        STRAPI_ADMIN_BACKEND_URL: http://localhost:1337
-        NODE_OPTIONS: --max-old-space-size=4096
-        
-        # Test user credentials
-        STRAPI_EMAIL: admin@strapi.io
-        STRAPI_PASSWORD: Admin123
-        
       with:
         build: npm run build
         start: npm run start:ci
         wait-on: 'http://localhost:1337'
         wait-on-timeout: 180
         working-directory: ./
-        
-        # Cypress configuration
-        browser: chrome
-        headed: false
-        quiet: true
         record: false
+        headed: false
+        browser: chrome
+        quiet: true
+        config: "baseUrl=http://localhost:1337,defaultCommandTimeout=30000"
+
+    - name: Stop Strapi
+      if: always()
+      run: |
+        if [ -f strapi.pid ]; then
+          echo "Stopping Strapi (PID: $(cat strapi.pid))"
+          kill -9 $(cat strapi.pid) || true
+          rm -f strapi.pid
+        fi
 
   deploy-staging:
     name: Deploy to Staging

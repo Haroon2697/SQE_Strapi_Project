@@ -108,5 +108,4 @@ describe('Strapi Admin Dashboard', () => {
     cy.viewport(1440, 900);
     cy.get('nav, aside').should('be.visible');
   });
-})
-
+});
