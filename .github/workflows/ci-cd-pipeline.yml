@@ -163,14 +163,21 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
 
-  # 6. Deploy to Staging
-  deploy-staging:
-    name: Deploy to Staging
+  # 6. Trigger Jenkins Deployment (CD)
+  # Note: Jenkins handles deployment (CD) separately
+  # GitHub Actions completes CI, Jenkins handles CD
+  notify-jenkins:
+    name: Notify Jenkins (CD)
     needs: docker
     runs-on: ubuntu-latest
-    environment: staging
+    if: github.ref == 'refs/heads/main'
     steps:
-      - run: echo "Deploying to staging..."
+      - name: Notify Jenkins for Deployment
+        run: |
+          echo "✅ CI Pipeline completed successfully!"
+          echo "📦 Docker image pushed to Docker Hub"
+          echo "🚀 Jenkins should now trigger deployment (CD)"
+          echo "Jenkins will pull the image and deploy to staging"
 
   # 7. Deploy to Production (Manual)
   deploy-production:
