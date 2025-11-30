@@ -19,7 +19,8 @@ module.exports = {
     '!**/src/**',
     '!**/utils/**',
     '!**/__tests__/**',
-    '!**/test-*.js'
+    '!**/test-*.js',
+    '!**/eslint.config.js'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['json', 'lcov', 'text', 'clover'],
@@ -29,7 +30,8 @@ module.exports = {
     '/.strapi/',
     '/cypress/',
     '/dist/',
-    '/build/'
+    '/build/',
+    '/tests/integration/' // Integration tests need Strapi running
   ],
   transform: {
     '^.+\\.js$': 'babel-jest'

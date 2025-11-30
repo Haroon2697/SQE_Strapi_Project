@@ -53,12 +53,13 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
-      - name: Run Unit Tests
+      - name: Run Unit Tests Only
         env:
           NODE_ENV: test
         run: |
           mkdir -p .tmp
-          npm run test:coverage
+          # Run only unit tests (exclude integration tests which need Strapi running)
+          npx jest tests/unit --coverage --config=jest.config.js
 
   # 3. Start Strapi and run Integration Tests
   integration-tests:
