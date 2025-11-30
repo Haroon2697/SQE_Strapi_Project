@@ -164,20 +164,22 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
 
   # 6. Trigger Jenkins Deployment (CD)
-  # Note: Jenkins handles deployment (CD) separately
-  # GitHub Actions completes CI, Jenkins handles CD
   notify-jenkins:
-    name: Notify Jenkins (CD)
+    name: Trigger Jenkins Deploy
     needs: docker
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Notify Jenkins for Deployment
+      - name: Call Jenkins Webhook
         run: |
-          echo "✅ CI Pipeline completed successfully!"
-          echo "📦 Docker image pushed to Docker Hub"
-          echo "🚀 Jenkins should now trigger deployment (CD)"
-          echo "Jenkins will pull the image and deploy to staging"
+          if [ -n "${{ secrets.JENKINS_WEBHOOK_URL }}" ]; then
+            curl -X POST "${{ secrets.JENKINS_WEBHOOK_URL }}" || echo "Jenkins webhook call failed, but continuing..."
+          else
+            echo "⚠️ JENKINS_WEBHOOK_URL not set. Jenkins deployment must be triggered manually."
+            echo "✅ CI Pipeline completed successfully!"
+            echo "📦 Docker image pushed to Docker Hub"
+            echo "🚀 Please trigger Jenkins pipeline manually or configure webhook URL"
+          fi
 
   # 7. Deploy to Production (Manual)
   deploy-production:
