@@ -192,9 +192,6 @@ jobs:
     steps:
       - name: Production Deployment Notice
         run: |
-          echo "🚀 Production deployment triggered"
-          echo "📝 Note: Production deployment should be handled by Jenkins"
-          echo "💡 Use Jenkins pipeline for production deployment"
-
-
-          # hello world
+          echo " Production deployment triggered"
+          echo " Note: Production deployment should be handled by Jenkins"
+          echo " Use Jenkins pipeline for production deployment"
