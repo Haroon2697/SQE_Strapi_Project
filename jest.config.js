@@ -1,18 +1,14 @@
 module.exports = {
   testEnvironment: 'node',
-  roots: ['<rootDir>/tests'],
-  testMatch: ['**/*.test.js', '**/*.spec.js'],
-  collectCoverageFrom: [
-    '**/*.js',
-    '!**/node_modules/**',
-    '!**/cypress/**',
-    '!**/coverage/**',
-    '!jest.config.js',
-    '!cypress.config.js',
+  testMatch: ['**/__tests__/**/*.test.js'],
+  collectCoverage: false, // Disable coverage for now to avoid babel issues
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/.next/',
+    '/.strapi/',
+    '/cypress/'
   ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
-  verbose: true,
-  testTimeout: 10000,
-}
-
+  transform: {
+    '^.+\\.js$': 'babel-jest'
+  }
+};

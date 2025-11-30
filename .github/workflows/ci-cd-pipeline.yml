@@ -1,0 +1,154 @@
+name: Comprehensive CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  NODE_ENV: test
+  HOST: 0.0.0.0
+  PORT: 1337
+  DATABASE_CLIENT: sqlite
+  DATABASE_FILENAME: .tmp/test.db
+  STRAPI_TELEMETRY_DISABLED: true
+  CYPRESS_BASE_URL: http://localhost:1337
+  CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
+  CYPRESS_ADMIN_PASSWORD: ${{ secrets.CYPRESS_ADMIN_PASSWORD }}
+  ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT }}
+  APP_KEYS: ${{ secrets.APP_KEYS }}
+  TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT }}
+  DOCKER_IMAGE: strapi-app
+  DOCKER_TAG: ${{ github.sha }}
+
+jobs:
+  # 1. Lint / Validate
+  lint:
+    name: Lint & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Run ESLint
+        run: npx eslint . --ext .js,.ts
+
+  # 2. Build & Unit Tests
+  build-and-test:
+    name: Build & Unit Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run build
+      - name: Run Unit & Integration Tests
+        run: npm run test:coverage
+      - name: Upload Coverage to Codecov
+        if: ${{ secrets.CODECOV_TOKEN }}
+        run: bash <(curl -s https://codecov.io/bash) -t ${{ secrets.CODECOV_TOKEN }}
+
+  # 3. E2E Tests
+  e2e:
+    name: E2E Tests
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run build
+      - name: Start Strapi
+        run: |
+          npm run develop &
+          echo $! > strapi.pid
+          echo "Waiting for Strapi to start..."
+          npx wait-on --timeout 300000 http://localhost:1337/admin
+      - name: Run Cypress E2E Tests
+        uses: cypress-io/github-action@v5
+        with:
+          browser: chrome
+          start: npm run develop
+          wait-on: 'http://localhost:1337'
+          wait-on-timeout: 300
+      - name: Stop Strapi
+        if: always()
+        run: |
+          if [ -f strapi.pid ]; then
+            kill -9 $(cat strapi.pid) || true
+            rm -f strapi.pid
+          fi
+          pkill -f 'node.*strapi' 2>/dev/null || true
+
+  # 4. Docker Build & Push
+  docker:
+    name: Build & Push Docker
+    needs: e2e
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
+
+  # 5. Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    needs: docker
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.example.com
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging..."
+          # Replace with real staging commands (Docker/K8s/SSH etc.)
+
+  # 6. Deploy to Production (Manual Approval)
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://example.com
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Production
+        run: |
+          echo "Deploying to production..."
+          # Replace with real production commands
+      - name: Run Smoke Tests
+        run: |
+          echo "Running production smoke tests..."
+          # Example: npx cypress run --spec "cypress/e2e/smoke.cy.js" --config baseUrl=${{ secrets.PRODUCTION_URL }}
