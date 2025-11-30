@@ -30,8 +30,8 @@ module.exports = {
     '/.strapi/',
     '/cypress/',
     '/dist/',
-    '/build/',
-    '/tests/integration/' // Integration tests need Strapi running
+    '/build/'
+    // Note: Integration tests are NOT ignored - they run in separate job with Strapi running
   ],
   transform: {
     '^.+\\.js$': 'babel-jest'

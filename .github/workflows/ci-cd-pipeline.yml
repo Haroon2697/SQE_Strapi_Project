@@ -95,20 +95,34 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
 
-      - name: Start Strapi (Fast CI Mode)
+      - name: Start Strapi
         env:
           NODE_ENV: test
           DATABASE_FILENAME: .tmp/test-integration.db
           STRAPI_TELEMETRY_DISABLED: true
         run: |
           mkdir -p .tmp
-          echo "Starting Strapi in CI mode (no admin rebuild)..."
+          echo "Starting Strapi in CI mode..."
           npm run start:ci > strapi.log 2>&1 &
           echo $! > strapi.pid
-          echo "Waiting for Strapi to be ready..."
-          npx wait-on http://localhost:1337/admin --timeout 60000 || true
-          sleep 3
-          echo "Strapi should be ready now"
+          echo "Waiting for Strapi to be ready (this may take 30-60 seconds)..."
+          # Wait up to 2 minutes for Strapi to start
+          for i in {1..24}; do
+            if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
+              echo "✅ Strapi is ready!"
+              break
+            fi
+            echo "Waiting... ($i/24 attempts, ~$((i*5)) seconds)"
+            sleep 5
+          done
+          # Final check
+          if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
+            echo "✅ Strapi confirmed ready"
+          else
+            echo "⚠️ Strapi may not be fully ready, but continuing with tests..."
+            echo "Last 50 lines of Strapi log:"
+            tail -50 strapi.log || true
+          fi
 
       - name: Run Integration Tests
         run: npm run test:integration
@@ -146,20 +160,34 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
 
-      - name: Start Strapi (Fast CI Mode)
+      - name: Start Strapi
         env:
           NODE_ENV: test
           DATABASE_FILENAME: .tmp/test-e2e.db
           STRAPI_TELEMETRY_DISABLED: true
         run: |
           mkdir -p .tmp
-          echo "Starting Strapi in CI mode (no admin rebuild)..."
+          echo "Starting Strapi in CI mode..."
           npm run start:ci > strapi-e2e.log 2>&1 &
           echo $! > strapi-e2e.pid
-          echo "Waiting for Strapi to be ready..."
-          npx wait-on http://localhost:1337/admin --timeout 60000 || true
-          sleep 3
-          echo "Strapi should be ready now"
+          echo "Waiting for Strapi to be ready (this may take 30-60 seconds)..."
+          # Wait up to 2 minutes for Strapi to start
+          for i in {1..24}; do
+            if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
+              echo "✅ Strapi is ready!"
+              break
+            fi
+            echo "Waiting... ($i/24 attempts, ~$((i*5)) seconds)"
+            sleep 5
+          done
+          # Final check
+          if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
+            echo "✅ Strapi confirmed ready"
+          else
+            echo "⚠️ Strapi may not be fully ready, but continuing with tests..."
+            echo "Last 50 lines of Strapi log:"
+            tail -50 strapi-e2e.log || true
+          fi
 
       - name: Run Cypress Tests (No Recording)
         uses: cypress-io/github-action@v6

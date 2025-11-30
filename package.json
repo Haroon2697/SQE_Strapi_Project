@@ -10,7 +10,7 @@
     "dev": "strapi develop",
     "develop": "node scripts/strapi-develop.js",
     "start": "strapi start",
-    "start:ci": "mkdir -p .tmp && NODE_ENV=test STRAPI_TELEMETRY_DISABLED=true npx strapi start --no-build",
+    "start:ci": "mkdir -p .tmp && NODE_ENV=test STRAPI_TELEMETRY_DISABLED=true npx strapi develop",
     "test": "npm run test:ci && npm run test:e2e",
     "test:ci": "npm run test:unit && npm run test:e2e",
     "test:watch": "jest --watch",
