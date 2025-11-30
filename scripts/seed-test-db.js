@@ -74,24 +74,6 @@ const seedDatabase = async () => {
   }
 };
 
-// Execute the seeding process
-seedDatabase();
-      const cmd = `NODE_ENV=test npx strapi admin:create-user \
-        --email=admin@strapi.io \
-        --password=Admin123 \
-        --firstname=Admin \
-        --lastname=User`;
-      
-      runCommand(cmd);
-      console.log('✅ Admin user created successfully');
-      return true;
-    }
-  } catch (error) {
-    console.error('❌ Error creating admin user:', error.message);
-    throw error;
-  }
-};
-
 // Main function
 const main = async () => {
   if (process.env.NODE_ENV !== 'test') {
