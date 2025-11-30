@@ -107,8 +107,8 @@ jobs:
           STRAPI_TELEMETRY_DISABLED: true
         run: |
           mkdir -p .tmp
-          echo "Starting Strapi in CI mode..."
-          # Start Strapi and show logs in real-time for debugging
+          echo "Starting Strapi in CI mode (using wrapper script for config handling)..."
+          # Use wrapper script that handles config copying after dist cleanup
           npm run start:ci > strapi.log 2>&1 &
           STRAPI_PID=$!
           echo $STRAPI_PID > strapi.pid
