@@ -11,24 +11,32 @@ module.exports = defineConfig({
     baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:1337',
     
     // Test timeouts (increased for CI)
-    defaultCommandTimeout: 30000,    // Increased from 15000
-    execTimeout: 120000,            // Increased from 60000
-    taskTimeout: 60000,
-    requestTimeout: 10000,
-    responseTimeout: 60000,         // Increased from 30000
-    pageLoadTimeout: 120000,        // Increased from 60000
+    defaultCommandTimeout: 60000,    // 60 seconds for CI
+    execTimeout: 120000,            // 2 minutes
+    taskTimeout: 60000,             // 1 minute
+    requestTimeout: 30000,          // 30 seconds
+    responseTimeout: 90000,         // 90 seconds
+    pageLoadTimeout: 120000,        // 2 minutes
     
-    // Test retries
+    // Retry attempts for flaky tests
     retries: {
-      runMode: 3,                   // Increased from 2
-      openMode: 1
+      runMode: 2,    // Retry failed tests up to 2 times in CI
+      openMode: 0    // Don't retry in interactive mode
     },
     
     // Test settings
     video: true,
+    videoUploadOnPasses: false,
     videoCompression: 32,           // Increased compression for smaller files
     screenshotOnRunFailure: true,
     trashAssetsBeforeRuns: true,
+    
+    // Environment variables for tests
+    env: {
+      baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:1337',
+      adminEmail: process.env.ADMIN_EMAIL || 'admin@example.com',
+      adminPassword: process.env.ADMIN_PASSWORD || 'Admin123'
+    },
     
     // Security settings
     chromeWebSecurity: false,

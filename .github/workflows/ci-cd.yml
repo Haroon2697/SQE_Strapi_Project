@@ -95,19 +95,58 @@ jobs:
       run: npm ci
       working-directory: ./
 
-    - name: Build Strapi
-      run: npm run build
-      working-directory: ./
+    - name: Start Strapi in background
+      run: |
+        nohup npm run develop > strapi.log 2>&1 & echo $! > strapi.pid
+        echo "Started Strapi with PID $(cat strapi.pid)"
+      env:
+        NODE_ENV: test
+        HOST: 0.0.0.0
+        PORT: 1337
+        DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
+        ADMIN_JWT_SECRET: test_admin_jwt_secret_12345
+        JWT_SECRET: test_jwt_secret_12345
+        API_TOKEN_SALT: test_api_token_salt_12345
+        APP_KEYS: test_app_keys_12345,test_app_keys_67890
+        TRANSFER_TOKEN_SALT: test_transfer_token_salt_12345
+        STRAPI_TELEMETRY_DISABLED: true
+
+    - name: Wait for Strapi to be ready
+      run: |
+        echo "Waiting for Strapi to start..."
+        for i in {1..30}; do
+          if curl -s http://localhost:1337/admin | grep -q "Strapi"; then
+            echo "Strapi is ready!"
+            exit 0
+          fi
+          echo "Waiting for Strapi to start... (attempt $i/30)"
+          sleep 5
+        done
+        echo "Strapi failed to start"
+        cat strapi.log
+        exit 1
       env:
         NODE_ENV: test
         DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
 
-    - name: Start Strapi in background
+    - name: Run Cypress tests
+      run: npx cypress run --e2e
+      env:
+        CYPRESS_BASE_URL: http://localhost:1337
+        CYPRESS_ADMIN_EMAIL: admin@example.com
+        CYPRESS_ADMIN_PASSWORD: Admin123
+        NODE_ENV: test
+      continue-on-error: false
+      timeout-minutes: 30
+
+    - name: Stop Strapi server
+      if: always()
       run: |
-        nohup npm run start:ci > strapi.log 2>&1 & 
-        echo $! > strapi.pid
-        echo "Strapi starting in background (PID: $(cat strapi.pid))"
-      working-directory: ./
+        if [ -f strapi.pid ]; then
+          echo "Stopping Strapi server (PID: $(cat strapi.pid))"
+          kill -9 $(cat strapi.pid) || true
+          rm -f strapi.pid
+        fi
       env:
         NODE_ENV: test
         DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
