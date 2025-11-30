@@ -38,21 +38,35 @@ if (!fs.existsSync(distDir)) {
 // Copy configs before starting
 if (fs.existsSync(sourceConfigDir)) {
   copyConfigs(sourceConfigDir, distConfigDir);
+  console.log('✓ Config files copied to dist/config');
 }
+
+// Check if running in background (CI mode)
+const isBackground = process.env.CI === 'true' || process.argv.includes('--background');
 
 // Start Strapi
 const strapiProcess = spawn('npx', ['strapi', 'develop', ...process.argv.slice(2)], {
-  stdio: 'inherit',
+  stdio: isBackground ? ['ignore', 'pipe', 'pipe'] : 'inherit',
   shell: true,
   cwd: path.resolve(__dirname, '..')
 });
+
+// If background mode, pipe output
+if (isBackground) {
+  strapiProcess.stdout.on('data', (data) => {
+    process.stdout.write(data);
+  });
+  strapiProcess.stderr.on('data', (data) => {
+    process.stderr.write(data);
+  });
+}
 
 // Watch for dist cleaning and re-copy configs
 // This is a workaround - we'll copy configs periodically
 const configWatcher = setInterval(() => {
   if (fs.existsSync(sourceConfigDir) && fs.existsSync(distDir)) {
     if (!fs.existsSync(distConfigDir) || 
-        fs.statSync(sourceConfigDir).mtime > fs.statSync(distConfigDir).mtime) {
+        (fs.existsSync(sourceConfigDir) && fs.statSync(sourceConfigDir).mtime > (fs.existsSync(distConfigDir) ? fs.statSync(distConfigDir).mtime : 0))) {
       copyConfigs(sourceConfigDir, distConfigDir);
     }
   }
@@ -69,3 +83,13 @@ strapiProcess.on('error', (err) => {
   process.exit(1);
 });
 
+// Handle process signals
+process.on('SIGINT', () => {
+  clearInterval(configWatcher);
+  strapiProcess.kill('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+  clearInterval(configWatcher);
+  strapiProcess.kill('SIGTERM');
+});
