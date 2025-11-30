@@ -1,19 +1,16 @@
+// Strapi v5 Database Configuration
+// Note: Use 'sqlite' as client name (Strapi recognizes this)
+// The better-sqlite3 package is used automatically when sqlite is specified
 module.exports = ({ env }) => {
-  // Use environment-specific config if it exists
-  const envConfig = require('fs').existsSync(`${__dirname}/env/${env('NODE_ENV', 'development')}/database.js`)
-    ? require(`./env/${env('NODE_ENV', 'development')}/database.js`)({ env })
-    : null;
-
-  // Default SQLite configuration
-  const defaultConfig = {
+  const filename = env('DATABASE_FILENAME', '.tmp/data.db');
+  
+  return {
     connection: {
       client: 'sqlite',
       connection: {
-        filename: `.tmp/${env('NODE_ENV', 'development')}.db`,
+        filename: filename,
       },
       useNullAsDefault: true,
     },
   };
-
-  return envConfig || defaultConfig;
 };

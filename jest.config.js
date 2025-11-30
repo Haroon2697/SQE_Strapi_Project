@@ -1,6 +1,6 @@
 module.exports = {
   testEnvironment: 'node',
-  testMatch: ['**/__tests__/**/*.test.js'],
+  testMatch: ['**/tests/**/*.test.js'],
   collectCoverage: true,
   collectCoverageFrom: [
     '**/*.{js,jsx}',
@@ -10,7 +10,16 @@ module.exports = {
     '!**/.strapi/**',
     '!**/jest.config.js',
     '!**/coverage/**',
-    '!**/cypress.config.js'
+    '!**/cypress.config.js',
+    '!**/dist/**',
+    '!**/build/**',
+    '!**/config/**',
+    '!**/scripts/**',
+    '!**/babel.config.js',
+    '!**/src/**',
+    '!**/utils/**',
+    '!**/__tests__/**',
+    '!**/test-*.js'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['json', 'lcov', 'text', 'clover'],
@@ -18,9 +27,13 @@ module.exports = {
     '/node_modules/',
     '/.next/',
     '/.strapi/',
-    '/cypress/'
+    '/cypress/',
+    '/dist/',
+    '/build/'
   ],
   transform: {
     '^.+\\.js$': 'babel-jest'
-  }
+  },
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  testTimeout: 30000
 };

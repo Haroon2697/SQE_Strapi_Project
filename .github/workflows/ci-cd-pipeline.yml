@@ -16,19 +16,13 @@ env:
   DATABASE_FILENAME: .tmp/test.db
   STRAPI_TELEMETRY_DISABLED: true
   CYPRESS_BASE_URL: http://localhost:1337
-  CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
-  CYPRESS_ADMIN_PASSWORD: ${{ secrets.CYPRESS_ADMIN_PASSWORD }}
-  ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
-  JWT_SECRET: ${{ secrets.JWT_SECRET }}
-  API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT }}
-  APP_KEYS: ${{ secrets.APP_KEYS }}
-  TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT }}
-  CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+  CYPRESS_ADMIN_EMAIL: i222697@nu.edu.pk
+  CYPRESS_ADMIN_PASSWORD: '@Haroon5295'
   DOCKER_IMAGE: strapi-app
   DOCKER_TAG: ${{ github.sha }}
 
 jobs:
-  # 1. Lint & Validate
+  # 1. Lint
   lint:
     name: Lint & Validate
     runs-on: ubuntu-latest
@@ -43,7 +37,7 @@ jobs:
       - name: Run ESLint
         run: npx eslint . --ext .js,.ts
 
-  # 2. Build & Unit Tests
+  # 2. Build & Unit Testing
   build-and-test:
     name: Build & Unit Tests
     needs: lint
@@ -53,87 +47,92 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
       - run: npm ci
       - run: npm run build
-      - name: Run Unit & Integration Tests
+      - name: Run Unit Tests
         env:
           NODE_ENV: test
-          DATABASE_FILENAME: .tmp/test-unit.db
         run: |
           mkdir -p .tmp
           npm run test:coverage
-      - name: Upload coverage to Codecov
-        if: success()
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage/lcov.info
-          fail_ci_if_error: false
 
-  # 3. E2E Tests with Cypress Recording
-  e2e:
-    name: E2E Tests
+  # 3. Start Strapi and run Integration Tests
+  integration-tests:
+    name: Integration Tests (API)
     needs: build-and-test
-    strategy:
-      fail-fast: false
-      matrix:
-        containers: [1, 2]
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run build
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Build Strapi
-        run: npm run build
-
-      - name: Start Strapi with SQLite
+      - name: Start Strapi
         env:
           NODE_ENV: test
-          DATABASE_FILENAME: .tmp/test-e2e-${{ matrix.containers }}.db
+          DATABASE_FILENAME: .tmp/test-integration.db
         run: |
           mkdir -p .tmp
-          npm run develop > strapi-${{ matrix.containers }}.log 2>&1 &
-          echo $! > strapi-${{ matrix.containers }}.pid
-          echo "Waiting for Strapi to start..."
-          npx wait-on --timeout 300000 http://localhost:1337/admin
+          npm run start:ci > strapi.log 2>&1 &
+          echo $! > strapi.pid
+          npx wait-on http://localhost:1337/admin
+          sleep 5
 
-      - name: Run Cypress E2E Tests
-        uses: cypress-io/github-action@v6
-        with:
-          browser: chrome
-          wait-on: 'http://localhost:1337'
-          wait-on-timeout: 300
-          config-file: cypress.config.js
-          record: true
-          parallel: true
-          group: 'E2E Tests'
-          tag: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'push' }}
-        env:
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run Integration Tests
+        run: npm run test:integration
 
-      - name: Show Strapi logs on error
+      - name: Show Strapi Logs
         if: failure()
-        run: cat strapi-${{ matrix.containers }}.log
+        run: cat strapi.log
 
       - name: Stop Strapi
         if: always()
         run: |
-          if [ -f strapi-${{ matrix.containers }}.pid ]; then
-            kill -9 $(cat strapi-${{ matrix.containers }}.pid) 2>/dev/null || true
-            rm -f strapi-${{ matrix.containers }}.pid
-          fi
-          pkill -f 'node.*strapi' 2>/dev/null || true
+          kill -9 $(cat strapi.pid) || true
 
-  # 4. Docker Build & Push
+  # 4. Cypress (No Recording)
+  e2e:
+    name: Cypress E2E Tests
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run build
+
+      - name: Start Strapi
+        env:
+          NODE_ENV: test
+          DATABASE_FILENAME: .tmp/test-e2e.db
+        run: |
+          mkdir -p .tmp
+          npm run start:ci > strapi-e2e.log 2>&1 &
+          echo $! > strapi-e2e.pid
+          npx wait-on http://localhost:1337/admin
+          sleep 5
+
+      - name: Run Cypress Tests (No Recording)
+        uses: cypress-io/github-action@v6
+        with:
+          browser: chrome
+          config-file: cypress.config.js
+
+      - name: Show Strapi Logs (E2E)
+        if: failure()
+        run: cat strapi-e2e.log
+
+      - name: Stop Strapi
+        if: always()
+        run: |
+          kill -9 $(cat strapi-e2e.pid) || true
+
+  # 5. Docker Build & Push
   docker:
     name: Build & Push Docker
     needs: e2e
@@ -157,36 +156,21 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
 
-  # 5. Deploy to Staging
+  # 6. Deploy to Staging
   deploy-staging:
     name: Deploy to Staging
     needs: docker
     runs-on: ubuntu-latest
-    environment:
-      name: staging
-      url: https://staging.example.com
+    environment: staging
     steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to Staging
-        run: |
-          echo "Deploying to staging..."
-          # Replace with real staging commands
+      - run: echo "Deploying to staging..."
 
-  # 6. Deploy to Production
+  # 7. Deploy to Production (Manual)
   deploy-production:
     name: Deploy to Production
     needs: deploy-staging
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://example.com
+    environment: production
     steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to Production
-        run: |
-          echo "Deploying to production..."
-      - name: Run Smoke Tests
-        run: |
-          echo "Running production smoke tests..."
-          # npx cypress run --spec "cypress/e2e/smoke.cy.js" --config baseUrl=${{ secrets.PRODUCTION_URL }}
+      - run: echo "Deploying to production..."

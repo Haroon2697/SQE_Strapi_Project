@@ -72,8 +72,8 @@ Cypress.Commands.add('isLoggedIn', () => {
 });
 
 describe('Strapi Admin Authentication', () => {
-  const email = Cypress.env('STRAPI_EMAIL') || 'admin@strapi.io';
-  const password = Cypress.env('STRAPI_PASSWORD') || 'Admin123';
+  const email = Cypress.env('CYPRESS_ADMIN_EMAIL') || Cypress.env('STRAPI_EMAIL') || '1222697@nu.edu.pk';
+  const password = Cypress.env('CYPRESS_ADMIN_PASSWORD') || Cypress.env('STRAPI_PASSWORD') || '@Haroon5295';
   
   beforeEach(() => {
     // Clear session before each test
