@@ -95,6 +95,11 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
 
+      - name: Build Strapi Admin (First Time)
+        run: |
+          echo "Building Strapi admin panel (one-time setup)..."
+          npm run build:ci
+      
       - name: Start Strapi
         env:
           NODE_ENV: test
@@ -103,25 +108,46 @@ jobs:
         run: |
           mkdir -p .tmp
           echo "Starting Strapi in CI mode..."
+          # Start Strapi and show logs in real-time for debugging
           npm run start:ci > strapi.log 2>&1 &
-          echo $! > strapi.pid
-          echo "Waiting for Strapi to be ready (this may take 30-60 seconds)..."
-          # Wait up to 2 minutes for Strapi to start
-          for i in {1..24}; do
+          STRAPI_PID=$!
+          echo $STRAPI_PID > strapi.pid
+          echo "Strapi process started with PID: $STRAPI_PID"
+          echo "Waiting for Strapi to be ready (this may take 60-90 seconds for first build)..."
+          
+          # Wait up to 3 minutes for Strapi to start (first build takes longer)
+          MAX_ATTEMPTS=36
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            # Check if process is still running
+            if ! kill -0 $STRAPI_PID 2>/dev/null; then
+              echo "❌ Strapi process died! Showing logs:"
+              cat strapi.log || true
+              exit 1
+            fi
+            
+            # Check if Strapi is responding
             if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-              echo "✅ Strapi is ready!"
+              echo "✅ Strapi is ready! (after ~$((i*5)) seconds)"
               break
             fi
-            echo "Waiting... ($i/24 attempts, ~$((i*5)) seconds)"
+            
+            # Show progress every 6 attempts (30 seconds)
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Still waiting... ($i/$MAX_ATTEMPTS attempts, ~$((i*5)) seconds)"
+              echo "Last 10 lines of Strapi log:"
+              tail -10 strapi.log || true
+            fi
+            
             sleep 5
           done
+          
           # Final check
           if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-            echo "✅ Strapi confirmed ready"
+            echo "✅ Strapi confirmed ready and responding"
           else
-            echo "⚠️ Strapi may not be fully ready, but continuing with tests..."
-            echo "Last 50 lines of Strapi log:"
-            tail -50 strapi.log || true
+            echo "⚠️ Strapi may not be fully ready, showing full log:"
+            cat strapi.log || true
+            echo "Continuing with tests anyway..."
           fi
 
       - name: Run Integration Tests
@@ -160,6 +186,11 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
 
+      - name: Build Strapi Admin (First Time)
+        run: |
+          echo "Building Strapi admin panel (one-time setup)..."
+          npm run build:ci
+      
       - name: Start Strapi
         env:
           NODE_ENV: test
@@ -168,25 +199,46 @@ jobs:
         run: |
           mkdir -p .tmp
           echo "Starting Strapi in CI mode..."
+          # Start Strapi and show logs in real-time for debugging
           npm run start:ci > strapi-e2e.log 2>&1 &
-          echo $! > strapi-e2e.pid
-          echo "Waiting for Strapi to be ready (this may take 30-60 seconds)..."
-          # Wait up to 2 minutes for Strapi to start
-          for i in {1..24}; do
+          STRAPI_PID=$!
+          echo $STRAPI_PID > strapi-e2e.pid
+          echo "Strapi process started with PID: $STRAPI_PID"
+          echo "Waiting for Strapi to be ready (this may take 60-90 seconds for first build)..."
+          
+          # Wait up to 3 minutes for Strapi to start (first build takes longer)
+          MAX_ATTEMPTS=36
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            # Check if process is still running
+            if ! kill -0 $STRAPI_PID 2>/dev/null; then
+              echo "❌ Strapi process died! Showing logs:"
+              cat strapi-e2e.log || true
+              exit 1
+            fi
+            
+            # Check if Strapi is responding
             if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-              echo "✅ Strapi is ready!"
+              echo "✅ Strapi is ready! (after ~$((i*5)) seconds)"
               break
             fi
-            echo "Waiting... ($i/24 attempts, ~$((i*5)) seconds)"
+            
+            # Show progress every 6 attempts (30 seconds)
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Still waiting... ($i/$MAX_ATTEMPTS attempts, ~$((i*5)) seconds)"
+              echo "Last 10 lines of Strapi log:"
+              tail -10 strapi-e2e.log || true
+            fi
+            
             sleep 5
           done
+          
           # Final check
           if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-            echo "✅ Strapi confirmed ready"
+            echo "✅ Strapi confirmed ready and responding"
           else
-            echo "⚠️ Strapi may not be fully ready, but continuing with tests..."
-            echo "Last 50 lines of Strapi log:"
-            tail -50 strapi-e2e.log || true
+            echo "⚠️ Strapi may not be fully ready, showing full log:"
+            cat strapi-e2e.log || true
+            echo "Continuing with tests anyway..."
           fi
 
       - name: Run Cypress Tests (No Recording)
