@@ -181,12 +181,17 @@ jobs:
             echo "🚀 Please trigger Jenkins pipeline manually or configure webhook URL"
           fi
 
-  # 7. Deploy to Production (Manual)
+  # 7. Deploy to Production (Manual - Optional)
+  # Note: Production deployment can be handled by Jenkins or manually
   deploy-production:
     name: Deploy to Production
-    needs: deploy-staging
+    needs: notify-jenkins
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - run: echo "Deploying to production..."
+      - name: Production Deployment Notice
+        run: |
+          echo "🚀 Production deployment triggered"
+          echo "📝 Note: Production deployment should be handled by Jenkins"
+          echo "💡 Use Jenkins pipeline for production deployment"
