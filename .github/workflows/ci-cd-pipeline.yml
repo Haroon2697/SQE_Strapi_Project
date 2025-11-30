@@ -187,30 +187,29 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
 
-      - name: Build Strapi Admin (First Time)
+      - name: Build Strapi Admin
         run: |
-          echo "Building Strapi admin panel (one-time setup)..."
+          echo "Building Strapi admin panel..."
           npm run build:ci
-          echo "Build complete, ensuring configs are in dist/config..."
-          node scripts/copy-configs.js
+          echo "Build complete - configs are in dist/config"
       
-      - name: Start Strapi
+      - name: Start Strapi (Production Mode)
         env:
           NODE_ENV: test
           DATABASE_FILENAME: .tmp/test-e2e.db
           STRAPI_TELEMETRY_DISABLED: true
         run: |
           mkdir -p .tmp
-          echo "Starting Strapi in CI mode..."
-          # Start Strapi and show logs in real-time for debugging
+          echo "Starting Strapi in production mode (strapi start - no dist cleanup)..."
+          # Use 'strapi start' - doesn't clean dist, so configs stay intact
           npm run start:ci > strapi-e2e.log 2>&1 &
           STRAPI_PID=$!
           echo $STRAPI_PID > strapi-e2e.pid
           echo "Strapi process started with PID: $STRAPI_PID"
-          echo "Waiting for Strapi to be ready (this may take 60-90 seconds for first build)..."
+          echo "Waiting for Strapi to be ready (should be fast - no rebuild needed)..."
           
-          # Wait up to 3 minutes for Strapi to start (first build takes longer)
-          MAX_ATTEMPTS=36
+          # Wait up to 2 minutes for Strapi to start
+          MAX_ATTEMPTS=24
           for i in $(seq 1 $MAX_ATTEMPTS); do
             # Check if process is still running
             if ! kill -0 $STRAPI_PID 2>/dev/null; then
