@@ -10,7 +10,7 @@
     "dev": "strapi develop",
     "develop": "strapi develop",
     "start": "strapi start",
-    "start:ci": "NODE_ENV=test STRAPI_TELEMETRY_DISABLED=true npx strapi develop --watch-admin",
+    "start:ci": "NODE_ENV=test STRAPI_TELEMETRY_DISABLED=true npx strapi start",
     "test": "npm run test:ci && npm run test:e2e",
     "test:ci": "NODE_ENV=test jest --ci --runInBand --detectOpenHandles --forceExit --testPathIgnorePatterns=tests/integration",
     "test:watch": "jest --watch",

@@ -1,27 +1,14 @@
-import path from 'path';
-
 export default ({ env }) => ({
   connection: {
     client: 'postgres',
     connection: {
       connectionString: env('DATABASE_URL'),
-      host: env('DATABASE_HOST', 'localhost'),
-      port: env.int('DATABASE_PORT', 5432),
-      database: env('DATABASE_NAME', 'strapi'),
-      user: env('DATABASE_USERNAME', 'strapi'),
-      password: env('DATABASE_PASSWORD', 'strapi'),
-      ssl: env.bool('DATABASE_SSL', false) ? {
-        rejectUnauthorized: env.bool('DATABASE_SSL_REJECT_UNAUTHORIZED', true),
-        ...(env('DATABASE_CA') && { ca: env('DATABASE_CA') }),
-        ...(env('DATABASE_CERT') && { cert: env('DATABASE_CERT') }),
-        ...(env('DATABASE_KEY') && { key: env('DATABASE_KEY') })
-      } : false,
-      schema: env('DATABASE_SCHEMA', 'public'),
+      ssl: false,
     },
     pool: { 
-      min: env.int('DATABASE_POOL_MIN', 2), 
-      max: env.int('DATABASE_POOL_MAX', 10) 
+      min: 0, 
+      max: 10 
     },
-    acquireConnectionTimeout: env.int('DATABASE_CONNECTION_TIMEOUT', 60000),
+    acquireConnectionTimeout: 60000,
   },
 });
