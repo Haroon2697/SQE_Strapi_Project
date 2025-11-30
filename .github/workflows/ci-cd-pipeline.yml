@@ -126,6 +126,9 @@ jobs:
         with:
           browser: chrome
           config-file: cypress.config.js
+        env:
+          CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
+          CYPRESS_ADMIN_PASSWORD: ${{ secrets.CYPRESS_ADMIN_PASSWORD }}
 
       - name: Show Strapi Logs (E2E)
         if: failure()
