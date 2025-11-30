@@ -191,6 +191,11 @@ jobs:
           echo "Building Strapi admin panel (one-time setup)..."
           npm run build:ci
       
+      - name: Copy Config Files to dist
+        run: |
+          echo "Ensuring config files are in dist/config..."
+          node scripts/copy-configs.js || echo "Config copy may have failed, but continuing..."
+      
       - name: Start Strapi
         env:
           NODE_ENV: test
