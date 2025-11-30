@@ -1,45 +1,81 @@
-const path = require('path');
-const fs = require('fs');
 const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 // Load environment variables
-require('dotenv').config({ path: path.join(__dirname, '../.env.test') });
+require('dotenv').config({ path: path.resolve(__dirname, '../.env.test') });
 
-// Ensure the database directory exists
-const dbDir = path.join(__dirname, '../.tmp');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
+// Database connection URL
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://strapi:strapi@localhost:5432/strapi_test';
 
-// Simple function to run shell commands
+// Admin user credentials
+const ADMIN_EMAIL = process.env.STRAPI_EMAIL || 'admin@strapi.io';
+const ADMIN_PASSWORD = process.env.STRAPI_PASSWORD || 'Admin123';
+
+console.log('🚀 Starting test database seeding...');
+
+// Function to run shell commands with error handling
 const runCommand = (command) => {
   try {
     console.log(`Running: ${command}`);
-    const output = execSync(command, { stdio: 'inherit' });
+    execSync(command, { stdio: 'inherit' });
     return true;
   } catch (error) {
     console.error(`❌ Command failed: ${command}`);
-    throw error;
+    console.error(error.message);
+    return false;
   }
 };
 
-// Create admin user using Strapi CLI
-const createAdminUser = async () => {
+// Main seeding function
+const seedDatabase = async () => {
+  console.log('🔍 Checking database connection...');
+  
   try {
-    // First, check if admin already exists by trying to get a JWT token
-    try {
-      const token = execSync(
-        'curl -X POST http://localhost:1337/admin/login \
-        -H "Content-Type: application/json" \
-        -d \'{"email":"admin@strapi.io","password":"Admin123"}\''
-      );
-      console.log('ℹ️ Admin user already exists');
-      return true;
-    } catch (e) {
-      // If we get here, the user doesn't exist or credentials are wrong
-      console.log('🌱 Creating admin user...');
-      
-      // Run the bootstrap command to create the first admin user
+    // Wait for database to be ready (useful in CI/CD)
+    const maxRetries = 10;
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        execSync('pg_isready -h localhost -p 5432', { stdio: 'ignore' });
+        console.log('✅ Database connection established');
+        break;
+      } catch (error) {
+        retries++;
+        if (retries === maxRetries) {
+          throw new Error('❌ Failed to connect to database after multiple attempts');
+        }
+        console.log(`⏳ Waiting for database to be ready (attempt ${retries}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+    
+    // Create admin user using Strapi CLI
+    console.log('👤 Creating admin user...');
+    const createUserCmd = `npx strapi admin:create-user \
+      --email=${ADMIN_EMAIL} \
+      --password=${ADMIN_PASSWORD} \
+      --firstname=Admin \
+      --lastname=User \
+      --roles=1 \
+      --no-interactive`;
+    
+    if (!runCommand(createUserCmd)) {
+      console.log('ℹ️ Admin user might already exist, continuing...');
+    }
+    
+    console.log('✅ Database seeding completed successfully!');
+    process.exit(0);
+    
+  } catch (error) {
+    console.error('❌ Error during database seeding:', error.message);
+    process.exit(1);
+  }
+};
+
+// Execute the seeding process
+seedDatabase();
       const cmd = `NODE_ENV=test npx strapi admin:create-user \
         --email=admin@strapi.io \
         --password=Admin123 \

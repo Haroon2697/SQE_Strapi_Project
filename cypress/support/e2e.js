@@ -13,9 +13,48 @@
 // https://on.cypress.io/configuration
 // ***********************************************************
 
-// Import commands.js using ES2015 syntax:
-import './commands'
+// ************// ***********************************************
+// This support file contains global setup and teardown
+// that runs before and after your tests.
+// ***********************************************
 
-// Alternatively you can use CommonJS syntax:
-// require('./commands')
+// Import commands.js
+import './commands';
 
+// Global before hook - runs once before all tests
+before(() => {
+  // Set up any global test data or state here
+  cy.log('Running global setup');
+});
+
+// Before each test
+beforeEach(() => {
+  // Clear cookies and local storage before each test
+  cy.clearCookies();
+  cy.clearLocalStorage();
+  
+  // Reset the database state if needed
+  // cy.exec('npm run db:reset');
+  
+  // Set a consistent viewport for all tests
+  cy.viewport(1280, 800);
+});
+
+// After each test
+afterEach(() => {
+  // Take a screenshot on test failure
+  if (Cypress.currentTest.state === 'failed') {
+    const specName = Cypress.spec.name.replace('.cy.js', '');
+    const testName = Cypress.currentTest.title;
+    const screenshotName = `${specName} -- ${testName} (failed).png`;
+    
+    // Take screenshot
+    cy.screenshot(screenshotName, { capture: 'runner' });
+  }
+});
+
+// After all tests
+after(() => {
+  // Clean up any test data or state here
+  cy.log('Running global teardown');
+});

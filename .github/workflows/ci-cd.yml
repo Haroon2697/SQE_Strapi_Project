@@ -93,20 +93,19 @@ jobs:
 
     - name: Run E2E tests
       uses: cypress-io/github-action@v5
-      with:
-        build: npm run build
-        start: npm run start:ci
-        wait-on: 'http://localhost:1337'
-        wait-on-timeout: 180
-        browser: chrome
-        config: "baseUrl=http://localhost:1337"
-        record: false
-        quiet: false
       env:
+        # Cypress-specific environment variables
+        CYPRESS_BASE_URL: http://localhost:1337
+        CYPRESS_STRAPI_EMAIL: admin@strapi.io
+        CYPRESS_STRAPI_PASSWORD: Admin123
+        
+        # Database configuration
+        DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
+        
+        # Strapi environment variables
         NODE_ENV: test
         HOST: 0.0.0.0
         PORT: 1337
-        DATABASE_URL: postgresql://strapi:strapi@localhost:5432/strapi_test
         ADMIN_JWT_SECRET: test_admin_jwt_secret_12345
         JWT_SECRET: test_jwt_secret_12345
         API_TOKEN_SALT: test_api_token_salt_12345
@@ -115,9 +114,23 @@ jobs:
         STRAPI_TELEMETRY_DISABLED: true
         STRAPI_ADMIN_BACKEND_URL: http://localhost:1337
         NODE_OPTIONS: --max-old-space-size=4096
+        
         # Test user credentials
         STRAPI_EMAIL: admin@strapi.io
         STRAPI_PASSWORD: Admin123
+        
+      with:
+        build: npm run build
+        start: npm run start:ci
+        wait-on: 'http://localhost:1337'
+        wait-on-timeout: 180
+        working-directory: ./
+        
+        # Cypress configuration
+        browser: chrome
+        headed: false
+        quiet: true
+        record: false
 
   deploy-staging:
     name: Deploy to Staging

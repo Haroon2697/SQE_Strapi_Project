@@ -1,14 +1,18 @@
 const { defineConfig } = require('cypress');
-const fs = require('fs');
 const path = require('path');
 
 // Load environment variables from .env file
 require('dotenv').config({ path: path.resolve(__dirname, '.env.test') });
 
 module.exports = defineConfig({
+  projectId: 'isk912',
   e2e: {
     // Base URL for your application
     baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:1337',
+    
+    // Experimental features
+    experimentalRunAllSpecs: true,
+    experimentalMemoryManagement: true,
     
     // Viewport settings
     viewportWidth: 1280,
@@ -34,6 +38,9 @@ module.exports = defineConfig({
     screenshotOnRunFailure: true,   // Take screenshots on test failures
     trashAssetsBeforeRuns: true,    // Clear screenshots/videos before test runs
     
+    // Security settings
+    chromeWebSecurity: false,       // Required for testing in development with self-signed certs
+    
     // Environment variables
     env: {
       // Strapi credentials (can be overridden with CYPRESS_STRAPI_* env vars)
@@ -50,46 +57,13 @@ module.exports = defineConfig({
     
     // Setup Node events
     setupNodeEvents(on, config) {
-      // Load environment variables from .env file
-      const env = { ...process.env, ...config.env };
-      
-      // Add custom tasks here if needed
-      // on('task', { ... });
-      
-      // Load plugins here if needed
-      // require('cypress-mochawesome-reporter/plugin')(on);
-      
-      // Support for cypress-grep
-      require('@cypress/grep/src/plugin')(config);
-      
-      // Return updated config
-      return {
-        ...config,
-        env: {
-          ...config.env,
-          ...env
-        }
-      };
-    }
-  },
-  
-  // Component testing (optional)
-  component: {
-    devServer: {
-      framework: 'react',
-      bundler: 'webpack',
+      // implement node event listeners here
+      return config;
     },
-    viewportWidth: 600,
-    viewportHeight: 800,
   },
   
   // Global configuration
   watchForFileChanges: false,  // Disable file watching in CI
-  numTestsKeptInMemory: 5,     // Reduce memory usage in CI
-  experimentalMemoryManagement: true, // Better memory management for large test suites
-  experimentalStudio: false,   // Disable experimental features in CI
-  experimentalRunAllSpecs: true, // Run all specs when clicking "Run all specs"
-  experimentalSessionSupport: true, // Enable session support
-  experimentalSessionAndOrigin: true // Enable session and origin support
+  numTestsKeptInMemory: 5      // Reduce memory usage in CI
 });
 
