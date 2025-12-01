@@ -106,6 +106,10 @@ jobs:
           NODE_ENV: test
           DATABASE_FILENAME: .tmp/test-integration.db
           STRAPI_TELEMETRY_DISABLED: true
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET || 'test-admin-jwt-secret-for-ci-12345678901234567890' }}
+          API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT || 'test-api-token-salt-for-ci-12345678901234567890' }}
+          TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT || 'test-transfer-token-salt-for-ci-12345678901234567890' }}
+          APP_KEYS: ${{ secrets.APP_KEYS || 'test-app-key-1-for-ci-12345678901234567890,test-app-key-2-for-ci-12345678901234567890' }}
         run: |
           mkdir -p .tmp
           echo "Starting Strapi in production mode (strapi start - no dist cleanup)..."
@@ -198,6 +202,10 @@ jobs:
           NODE_ENV: test
           DATABASE_FILENAME: .tmp/test-e2e.db
           STRAPI_TELEMETRY_DISABLED: true
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET || 'test-admin-jwt-secret-for-ci-12345678901234567890' }}
+          API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT || 'test-api-token-salt-for-ci-12345678901234567890' }}
+          TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT || 'test-transfer-token-salt-for-ci-12345678901234567890' }}
+          APP_KEYS: ${{ secrets.APP_KEYS || 'test-app-key-1-for-ci-12345678901234567890,test-app-key-2-for-ci-12345678901234567890' }}
         run: |
           mkdir -p .tmp
           echo "Starting Strapi in production mode (strapi start - no dist cleanup)..."
