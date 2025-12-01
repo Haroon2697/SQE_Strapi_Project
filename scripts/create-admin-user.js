@@ -16,56 +16,34 @@ const ADMIN_FIRSTNAME = process.env.STRAPI_TEST_FIRSTNAME || 'Haroon';
 const ADMIN_LASTNAME = process.env.STRAPI_TEST_LASTNAME || 'Aziz';
 
 async function createAdminUser() {
+  // First, try using Strapi CLI command (simplest method)
   try {
-    // Import Strapi
-    const strapi = require('@strapi/strapi');
+    const { execSync } = require('child_process');
+    console.log('📝 Attempting to create admin user via Strapi CLI...');
     
-    // Start Strapi instance
-    const app = await strapi({
-      distDir: path.resolve(__dirname, '../dist'),
-      autoReload: false,
-      serveAdminPanel: false,
-    }).load();
-
-    // Check if admin user already exists
-    const existingAdmin = await strapi.admin.services.user.findOne({
-      email: ADMIN_EMAIL,
-    });
-
-    if (existingAdmin) {
-      console.log(`✅ Admin user already exists: ${ADMIN_EMAIL}`);
-      await app.destroy();
+    const cmd = `npx strapi admin:create-user --email="${ADMIN_EMAIL}" --password="${ADMIN_PASSWORD}" --firstname="${ADMIN_FIRSTNAME}" --lastname="${ADMIN_LASTNAME}" --no-interactive`;
+    
+    try {
+      execSync(cmd, { 
+        stdio: 'inherit',
+        env: { ...process.env, NODE_ENV: 'test' },
+        cwd: path.resolve(__dirname, '..'),
+      });
+      console.log(`✅ Admin user created successfully via CLI: ${ADMIN_EMAIL}`);
       return;
+    } catch (cliError) {
+      if (cliError.message.includes('already exists') || cliError.stdout?.toString().includes('already exists')) {
+        console.log(`✅ Admin user already exists: ${ADMIN_EMAIL}`);
+        return;
+      }
+      console.log('⚠️ CLI method failed, trying API method...');
     }
-
-    // Create admin user
-    const adminUser = await strapi.admin.services.user.create({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      firstname: ADMIN_FIRSTNAME,
-      lastname: ADMIN_LASTNAME,
-      isActive: true,
-    });
-
-    if (adminUser) {
-      console.log(`✅ Admin user created successfully: ${ADMIN_EMAIL}`);
-    } else {
-      console.log('⚠️ Failed to create admin user');
-    }
-
-    await app.destroy();
   } catch (error) {
-    // If Strapi is already running, try using API instead
-    if (error.code === 'EADDRINUSE' || error.message.includes('already in use')) {
-      console.log('⚠️ Strapi is already running, trying API method...');
-      await createAdminViaAPI();
-      return;
-    }
-    
-    console.error('❌ Error creating admin user:', error.message);
-    // Don't fail the script - tests will handle missing user gracefully
-    process.exit(0);
+    console.log('⚠️ CLI method not available, trying API method...');
   }
+  
+  // Fallback: Try using API
+  await createAdminViaAPI();
 }
 
 async function createAdminViaAPI() {
