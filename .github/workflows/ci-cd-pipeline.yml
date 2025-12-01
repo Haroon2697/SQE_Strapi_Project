@@ -101,12 +101,41 @@ jobs:
           npm run build:ci
           echo "Build complete - configs are in dist/config"
       
+      - name: Validate Required Secrets
+        run: |
+          echo "Checking required Strapi secrets..."
+          if [ -z "${{ secrets.ADMIN_JWT_SECRET }}" ]; then
+            echo "⚠️ WARNING: ADMIN_JWT_SECRET not set in GitHub Secrets"
+            echo "Using fallback value (may cause issues)"
+          else
+            echo "✅ ADMIN_JWT_SECRET is set"
+          fi
+          if [ -z "${{ secrets.APP_KEYS }}" ]; then
+            echo "⚠️ WARNING: APP_KEYS not set in GitHub Secrets"
+            echo "Using fallback value (may cause issues)"
+          else
+            echo "✅ APP_KEYS is set"
+          fi
+          if [ -z "${{ secrets.API_TOKEN_SALT }}" ]; then
+            echo "⚠️ WARNING: API_TOKEN_SALT not set in GitHub Secrets"
+            echo "Using fallback value (may cause issues)"
+          else
+            echo "✅ API_TOKEN_SALT is set"
+          fi
+          if [ -z "${{ secrets.TRANSFER_TOKEN_SALT }}" ]; then
+            echo "⚠️ WARNING: TRANSFER_TOKEN_SALT not set in GitHub Secrets"
+            echo "Using fallback value (may cause issues)"
+          else
+            echo "✅ TRANSFER_TOKEN_SALT is set"
+          fi
+      
       - name: Start Strapi (Production Mode)
         env:
           NODE_ENV: test
           DATABASE_FILENAME: .tmp/test-integration.db
           STRAPI_TELEMETRY_DISABLED: true
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET || 'test-admin-jwt-secret-for-ci-12345678901234567890' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret-for-ci-12345678901234567890' }}
           API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT || 'test-api-token-salt-for-ci-12345678901234567890' }}
           TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT || 'test-transfer-token-salt-for-ci-12345678901234567890' }}
           APP_KEYS: ${{ secrets.APP_KEYS || 'test-app-key-1-for-ci-12345678901234567890,test-app-key-2-for-ci-12345678901234567890' }}
@@ -197,12 +226,29 @@ jobs:
           npm run build:ci
           echo "Build complete - configs are in dist/config"
       
+      - name: Validate Required Secrets
+        run: |
+          echo "Checking required Strapi secrets..."
+          if [ -z "${{ secrets.ADMIN_JWT_SECRET }}" ]; then
+            echo "⚠️ WARNING: ADMIN_JWT_SECRET not set in GitHub Secrets"
+            echo "Using fallback value (may cause issues)"
+          else
+            echo "✅ ADMIN_JWT_SECRET is set"
+          fi
+          if [ -z "${{ secrets.APP_KEYS }}" ]; then
+            echo "⚠️ WARNING: APP_KEYS not set in GitHub Secrets"
+            echo "Using fallback value (may cause issues)"
+          else
+            echo "✅ APP_KEYS is set"
+          fi
+      
       - name: Start Strapi (Production Mode)
         env:
           NODE_ENV: test
           DATABASE_FILENAME: .tmp/test-e2e.db
           STRAPI_TELEMETRY_DISABLED: true
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET || 'test-admin-jwt-secret-for-ci-12345678901234567890' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret-for-ci-12345678901234567890' }}
           API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT || 'test-api-token-salt-for-ci-12345678901234567890' }}
           TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT || 'test-transfer-token-salt-for-ci-12345678901234567890' }}
           APP_KEYS: ${{ secrets.APP_KEYS || 'test-app-key-1-for-ci-12345678901234567890,test-app-key-2-for-ci-12345678901234567890' }}
