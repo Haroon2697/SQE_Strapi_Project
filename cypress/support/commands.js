@@ -11,26 +11,54 @@
 // Custom command to log in to Strapi admin
 Cypress.Commands.add('login', (email, password) => {
   cy.session([email, password], () => {
-    cy.visit('/admin')
+    cy.visit('/admin', { timeout: 60000 })
     
-    // Check if already logged in
+    // Wait for page to load
+    cy.get('body', { timeout: 30000 }).should('be.visible')
+    
+    // Check if already logged in or on login page
     cy.get('body').then(($body) => {
-      if ($body.find('input[type="email"]').length > 0) {
-        // Fill out the login form
-        cy.get('input[type="email"]').should('be.visible').type(email, { delay: 50 })
-        cy.get('input[type="password"]').should('be.visible').type(password, { delay: 50 })
-        cy.get('button[type="submit"]').should('be.visible').click()
+      // Look for login form elements
+      const hasEmailInput = $body.find('input[type="email"], input[name="email"]').length > 0;
+      
+      if (hasEmailInput) {
+        // Fill out the login form with more flexible selectors
+        cy.get('input[type="email"], input[name="email"]', { timeout: 15000 })
+          .first()
+          .should('be.visible')
+          .clear()
+          .type(email, { delay: 50 })
         
-        // Wait for successful login
-        cy.url({ timeout: 30000 }).should('include', '/admin')
-        cy.get('nav, aside', { timeout: 20000 }).should('be.visible')
+        cy.get('input[type="password"], input[name="password"]', { timeout: 15000 })
+          .first()
+          .should('be.visible')
+          .clear()
+          .type(password, { delay: 50 })
+        
+        cy.get('button[type="submit"]', { timeout: 15000 })
+          .first()
+          .should('be.visible')
+          .click({ force: true })
+        
+        // Wait for successful login - more flexible checks
+        cy.url({ timeout: 45000 }).should('include', '/admin').and('not.include', '/login')
+        
+        // Wait for navigation to appear
+        cy.get('nav, aside, [role="navigation"], [class*="nav"]', { timeout: 20000 })
+          .should('be.visible')
+      } else {
+        // Already logged in, just verify
+        cy.url({ timeout: 10000 }).should('include', '/admin')
+        cy.get('nav, aside, [role="navigation"]', { timeout: 10000 }).should('be.visible')
       }
     })
   }, {
     validate: () => {
       // Validate the session by checking for admin elements
       cy.getCookie('strapi_jwt').should('exist')
-    }
+      cy.get('nav, aside, [role="navigation"]', { timeout: 5000 }).should('be.visible')
+    },
+    cacheAcrossSpecs: false // Don't cache across different test files
   })
 })
 
