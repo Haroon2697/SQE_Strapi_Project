@@ -315,6 +315,14 @@ jobs:
             cat strapi-e2e.log || true
             echo "Continuing with tests anyway..."
           fi
+          
+          # Give Strapi a few more seconds to fully initialize
+          echo "Waiting 5 seconds for Strapi to fully initialize..."
+          sleep 5
+          
+          # Try to create admin user for testing
+          echo "Attempting to create admin user for tests..."
+          node scripts/create-admin-user.js || echo "⚠️ Admin user creation failed, tests will handle gracefully"
 
       - name: Run Cypress Tests (No Recording)
         uses: cypress-io/github-action@v6
