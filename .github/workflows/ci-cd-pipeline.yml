@@ -327,7 +327,7 @@ jobs:
       - name: Run Cypress Tests (No Recording)
         uses: cypress-io/github-action@v6
         with:
-          browser: chrome
+          browser: firefox
           config-file: cypress.config.js
         env:
           CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
