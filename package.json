@@ -6,7 +6,6 @@
   "scripts": {
     "build": "strapi build && node scripts/copy-configs.js",
     "build:ci": "strapi build && node scripts/copy-configs.js || echo 'Build failed, but continuing...'",
-    "build:ci": "strapi build || echo 'Build failed, but continuing...'",
     "console": "strapi console",
     "deploy": "strapi deploy",
     "dev": "strapi develop",
