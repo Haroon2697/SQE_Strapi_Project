@@ -51,45 +51,89 @@ async function createAdminViaAPI() {
   const BASE_URL = process.env.STRAPI_URL || 'http://localhost:1337';
 
   return new Promise((resolve) => {
-    // Try to register a user (if registration is enabled)
-    const postData = JSON.stringify({
+    // First, try the admin registration endpoint (when no admin exists)
+    const adminRegisterData = JSON.stringify({
       email: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
-      username: ADMIN_EMAIL.split('@')[0],
       firstname: ADMIN_FIRSTNAME,
       lastname: ADMIN_LASTNAME,
     });
 
-    const options = {
+    const adminOptions = {
       hostname: 'localhost',
       port: 1337,
-      path: '/api/auth/local/register',
+      path: '/admin/auth/register-admin',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
+        'Content-Length': Buffer.byteLength(adminRegisterData),
       },
     };
 
-    const req = http.request(options, (res) => {
-      if (res.statusCode === 200 || res.statusCode === 201) {
-        console.log(`✅ Admin user created via API: ${ADMIN_EMAIL}`);
-      } else {
-        console.log(`⚠️ Could not create admin user via API (status: ${res.statusCode})`);
-        console.log('⚠️ Admin user may need to be created manually via http://localhost:1337/admin');
-      }
-      resolve();
+    const adminReq = http.request(adminOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode === 200 || res.statusCode === 201) {
+          console.log(`✅ Admin user created via admin registration endpoint: ${ADMIN_EMAIL}`);
+          resolve();
+        } else {
+          // If admin registration fails, try regular user registration
+          console.log(`⚠️ Admin registration failed (status: ${res.statusCode}), trying user registration...`);
+          tryUserRegistration(resolve);
+        }
+      });
     });
 
-    req.on('error', (error) => {
-      console.log('⚠️ Could not connect to Strapi API:', error.message);
-      console.log('⚠️ Admin user may need to be created manually via http://localhost:1337/admin');
-      resolve();
+    adminReq.on('error', (error) => {
+      console.log('⚠️ Could not connect to admin registration endpoint, trying user registration...');
+      tryUserRegistration(resolve);
     });
 
-    req.write(postData);
-    req.end();
+    adminReq.write(adminRegisterData);
+    adminReq.end();
   });
+}
+
+function tryUserRegistration(resolve) {
+  const http = require('http');
+  const postData = JSON.stringify({
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+    username: ADMIN_EMAIL.split('@')[0],
+    firstname: ADMIN_FIRSTNAME,
+    lastname: ADMIN_LASTNAME,
+  });
+
+  const options = {
+    hostname: 'localhost',
+    port: 1337,
+    path: '/api/auth/local/register',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    if (res.statusCode === 200 || res.statusCode === 201) {
+      console.log(`✅ Admin user created via user registration: ${ADMIN_EMAIL}`);
+    } else {
+      console.log(`⚠️ Could not create admin user via API (status: ${res.statusCode})`);
+      console.log('⚠️ Admin user may need to be created manually via http://localhost:1337/admin');
+    }
+    resolve();
+  });
+
+  req.on('error', (error) => {
+    console.log('⚠️ Could not connect to Strapi API:', error.message);
+    console.log('⚠️ Admin user may need to be created manually via http://localhost:1337/admin');
+    resolve();
+  });
+
+  req.write(postData);
+  req.end();
 }
 
 // Run the script

@@ -16,13 +16,13 @@ Cypress.Commands.add('login', (email, password) => {
     // Wait for page to load
     cy.get('body', { timeout: 30000 }).should('be.visible')
     
-    // Check if already logged in or on login page
-    cy.get('body').then(($body) => {
-      // Look for login form elements
-      const hasEmailInput = $body.find('input[type="email"], input[name="email"]').length > 0;
-      
-      if (hasEmailInput) {
-        // Fill out the login form with more flexible selectors
+    // Check current URL to see if we're on registration or login page
+    cy.url().then((url) => {
+      // If we're on registration page, fill it out
+      if (url.includes('/register-admin')) {
+        cy.log('📝 On admin registration page - filling out registration form...');
+        
+        // Fill registration form
         cy.get('input[type="email"], input[name="email"]', { timeout: 15000 })
           .first()
           .should('be.visible')
@@ -35,21 +35,70 @@ Cypress.Commands.add('login', (email, password) => {
           .clear()
           .type(password, { delay: 50 })
         
+        // Look for firstname and lastname fields (if they exist)
+        cy.get('body').then(($body) => {
+          if ($body.find('input[name="firstname"], input[placeholder*="first" i]').length > 0) {
+            cy.get('input[name="firstname"], input[placeholder*="first" i]')
+              .first()
+              .clear()
+              .type('Haroon', { delay: 50 })
+          }
+          if ($body.find('input[name="lastname"], input[placeholder*="last" i]').length > 0) {
+            cy.get('input[name="lastname"], input[placeholder*="last" i]')
+              .first()
+              .clear()
+              .type('Aziz', { delay: 50 })
+          }
+        })
+        
         cy.get('button[type="submit"]', { timeout: 15000 })
           .first()
           .should('be.visible')
           .click({ force: true })
         
-        // Wait for successful login - more flexible checks
-        cy.url({ timeout: 45000 }).should('include', '/admin').and('not.include', '/login')
+        // Wait for redirect to dashboard after registration
+        cy.url({ timeout: 45000 }).should('include', '/admin').and('not.include', '/register')
         
         // Wait for navigation to appear
         cy.get('nav, aside, [role="navigation"], [class*="nav"]', { timeout: 20000 })
           .should('be.visible')
       } else {
-        // Already logged in, just verify
-        cy.url({ timeout: 10000 }).should('include', '/admin')
-        cy.get('nav, aside, [role="navigation"]', { timeout: 10000 }).should('be.visible')
+        // On login page or already logged in
+        cy.get('body').then(($body) => {
+          // Look for login form elements
+          const hasEmailInput = $body.find('input[type="email"], input[name="email"]').length > 0;
+          
+          if (hasEmailInput) {
+            // Fill out the login form with more flexible selectors
+            cy.get('input[type="email"], input[name="email"]', { timeout: 15000 })
+              .first()
+              .should('be.visible')
+              .clear()
+              .type(email, { delay: 50 })
+            
+            cy.get('input[type="password"], input[name="password"]', { timeout: 15000 })
+              .first()
+              .should('be.visible')
+              .clear()
+              .type(password, { delay: 50 })
+            
+            cy.get('button[type="submit"]', { timeout: 15000 })
+              .first()
+              .should('be.visible')
+              .click({ force: true })
+            
+            // Wait for successful login - more flexible checks
+            cy.url({ timeout: 45000 }).should('include', '/admin').and('not.include', '/login')
+            
+            // Wait for navigation to appear
+            cy.get('nav, aside, [role="navigation"], [class*="nav"]', { timeout: 20000 })
+              .should('be.visible')
+          } else {
+            // Already logged in, just verify
+            cy.url({ timeout: 10000 }).should('include', '/admin')
+            cy.get('nav, aside, [role="navigation"]', { timeout: 10000 }).should('be.visible')
+          }
+        })
       }
     })
   }, {
