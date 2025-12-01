@@ -198,6 +198,10 @@ jobs:
           # Give Strapi a few more seconds to fully initialize
           echo "Waiting 5 seconds for Strapi to fully initialize..."
           sleep 5
+          
+          # Try to create admin user for testing
+          echo "Attempting to create admin user for tests..."
+          node scripts/create-admin-user.js || echo "⚠️ Admin user creation failed, tests will handle gracefully"
 
       - name: Run Integration Tests
         run: npm run test:integration
