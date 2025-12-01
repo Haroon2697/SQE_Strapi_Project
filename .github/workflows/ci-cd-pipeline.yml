@@ -180,14 +180,24 @@ jobs:
             sleep 5
           done
           
-          # Final check
+          # Final check - also check API endpoint
           if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-            echo "✅ Strapi confirmed ready and responding"
+            echo "✅ Strapi admin confirmed ready"
+            # Also check API endpoint
+            if curl -s -f http://localhost:1337/api > /dev/null 2>&1 || curl -s http://localhost:1337/api | grep -q "strapi\|api"; then
+              echo "✅ Strapi API confirmed ready"
+            else
+              echo "⚠️ Strapi API may not be ready, but continuing..."
+            fi
           else
             echo "⚠️ Strapi may not be fully ready, showing full log:"
             cat strapi.log || true
             echo "Continuing with tests anyway..."
           fi
+          
+          # Give Strapi a few more seconds to fully initialize
+          echo "Waiting 5 seconds for Strapi to fully initialize..."
+          sleep 5
 
       - name: Run Integration Tests
         run: npm run test:integration

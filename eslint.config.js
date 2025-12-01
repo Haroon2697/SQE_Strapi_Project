@@ -28,6 +28,15 @@ export default [
         afterAll: 'readonly',
         cy: 'readonly',
         Cypress: 'readonly',
+        // Browser globals for Cypress
+        document: 'readonly',
+        window: 'readonly',
+        // Mocha/Cypress globals
+        chai: 'readonly',
+        before: 'readonly',
+        after: 'readonly',
+        // Cypress specific
+        runnable: 'readonly',
       },
     },
     rules: {
@@ -39,6 +48,27 @@ export default [
       'no-console': 'off', // Allow console.log in Strapi
       'no-undef': 'error',
       'no-redeclare': 'error',
+    },
+  },
+  {
+    // Cypress-specific configuration
+    files: ['cypress/**/*.js', 'cypress/**/*.ts'],
+    languageOptions: {
+      globals: {
+        cy: 'readonly',
+        Cypress: 'readonly',
+        document: 'readonly',
+        window: 'readonly',
+        chai: 'readonly',
+        before: 'readonly',
+        after: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        runnable: 'readonly',
+      },
     },
   },
   {
