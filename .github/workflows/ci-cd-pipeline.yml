@@ -199,9 +199,18 @@ jobs:
           echo "Waiting 5 seconds for Strapi to fully initialize..."
           sleep 5
           
-          # Try to create admin user for testing
+          # Try to create admin user for testing (with retries)
           echo "Attempting to create admin user for tests..."
-          node scripts/create-admin-user.js || echo "⚠️ Admin user creation failed, tests will handle gracefully"
+          for i in {1..3}; do
+            echo "Attempt $i/3 to create admin user..."
+            if node scripts/create-admin-user.js; then
+              echo "✅ Admin user created successfully!"
+              break
+            else
+              echo "⚠️ Attempt $i failed, waiting 3 seconds before retry..."
+              sleep 3
+            fi
+          done
 
       - name: Run Integration Tests
         run: npm run test:integration
@@ -320,9 +329,27 @@ jobs:
           echo "Waiting 5 seconds for Strapi to fully initialize..."
           sleep 5
           
-          # Try to create admin user for testing
+          # Try to create admin user for testing (with retries)
           echo "Attempting to create admin user for tests..."
-          node scripts/create-admin-user.js || echo "⚠️ Admin user creation failed, tests will handle gracefully"
+          for i in {1..3}; do
+            echo "Attempt $i/3 to create admin user..."
+            if node scripts/create-admin-user.js; then
+              echo "✅ Admin user created successfully!"
+              break
+            else
+              echo "⚠️ Attempt $i failed, waiting 3 seconds before retry..."
+              sleep 3
+            fi
+          done
+          
+          # Verify admin user was created by checking if we can access login page
+          echo "Verifying admin user creation..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:1337/admin/auth/login || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Admin login page accessible (admin may exist)"
+          else
+            echo "⚠️ Admin login page returned HTTP $HTTP_CODE (may need registration)"
+          fi
 
       - name: Run Cypress Tests (No Recording)
         uses: cypress-io/github-action@v6
