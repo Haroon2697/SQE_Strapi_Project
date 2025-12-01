@@ -46,7 +46,40 @@ async function createAdminUser() {
   await createAdminViaAPI();
 }
 
+async function waitForStrapi(maxRetries = 10, delay = 2000) {
+  const http = require('http');
+  console.log('⏳ Waiting for Strapi to be ready...');
+  
+  for (let i = 1; i <= maxRetries; i++) {
+    try {
+      await new Promise((resolve, reject) => {
+        const req = http.get('http://localhost:1337/admin', { timeout: 3000 }, (res) => {
+          resolve();
+        });
+        req.on('error', reject);
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('Timeout'));
+        });
+      });
+      console.log('✅ Strapi is ready!');
+      return true;
+    } catch (error) {
+      if (i === maxRetries) {
+        console.log('⚠️ Strapi may not be fully ready, but continuing...');
+        return false;
+      }
+      console.log(`⏳ Waiting for Strapi... (attempt ${i}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  return false;
+}
+
 async function createAdminViaAPI() {
+  // Wait for Strapi to be ready first
+  await waitForStrapi();
+  
   const http = require('http');
   const BASE_URL = process.env.STRAPI_URL || 'http://localhost:1337';
 
@@ -80,13 +113,15 @@ async function createAdminViaAPI() {
         } else {
           // If admin registration fails, try regular user registration
           console.log(`⚠️ Admin registration failed (status: ${res.statusCode}), trying user registration...`);
+          console.log(`Response: ${data.substring(0, 200)}`);
           tryUserRegistration(resolve);
         }
       });
     });
 
     adminReq.on('error', (error) => {
-      console.log('⚠️ Could not connect to admin registration endpoint, trying user registration...');
+      console.log('⚠️ Could not connect to admin registration endpoint:', error.message);
+      console.log('⚠️ Trying user registration as fallback...');
       tryUserRegistration(resolve);
     });
 
