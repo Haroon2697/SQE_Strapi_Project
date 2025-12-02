@@ -1,61 +1,78 @@
-# 🚀 Getting started with Strapi
+# 🛍️ SQE Saleor Project - CI/CD & Testing
 
-Strapi comes with a full featured [Command Line Interface](https://docs.strapi.io/dev-docs/cli) (CLI) which lets you scaffold and manage your project in seconds.
+> **⚠️ MIGRATION NOTICE:** This project has been migrated from Strapi to Saleor.  
+> See [MIGRATION_COMPLETE.md](MIGRATION_COMPLETE.md) for details.
 
-### `develop`
+## 📋 Quick Links
 
-Start your Strapi application with autoReload enabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-develop)
-
-```
-npm run develop
-# or
-yarn develop
-```
-
-### `start`
-
-Start your Strapi application with autoReload disabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-start)
-
-```
-npm run start
-# or
-yarn start
-```
-
-### `build`
-
-Build your admin panel. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-build)
-
-```
-npm run build
-# or
-yarn build
-```
-
-## ⚙️ Deployment
-
-Strapi gives you many possible deployment options for your project including [Strapi Cloud](https://cloud.strapi.io). Browse the [deployment section of the documentation](https://docs.strapi.io/dev-docs/deployment) to find the best solution for your use case.
-
-```
-yarn strapi deploy
-```
-
-## 📚 Learn more
-
-- [Resource center](https://strapi.io/resource-center) - Strapi resource center.
-- [Strapi documentation](https://docs.strapi.io) - Official Strapi documentation.
-- [Strapi tutorials](https://strapi.io/tutorials) - List of tutorials made by the core team and the community.
-- [Strapi blog](https://strapi.io/blog) - Official Strapi blog containing articles made by the Strapi team and the community.
-- [Changelog](https://strapi.io/changelog) - Find out about the Strapi product updates, new features and general improvements.
-
-Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/strapi). Your feedback and contributions are welcome!
-
-## ✨ Community
-
-- [Discord](https://discord.strapi.io) - Come chat with the Strapi community including the core team.
-- [Forum](https://forum.strapi.io/) - Place to discuss, ask questions and find answers, show your Strapi project and get feedback or just talk with other Community members.
-- [Awesome Strapi](https://github.com/strapi/awesome-strapi) - A curated list of awesome things related to Strapi.
+- **[README_SALEOR.md](README_SALEOR.md)** - Complete Saleor setup guide
+- **[TEST_PLAN_SALEOR.md](TEST_PLAN_SALEOR.md)** - IEEE 829 test plan
+- **[PROJECT_SUMMARY_SALEOR.md](PROJECT_SUMMARY_SALEOR.md)** - Project summary
+- **[MIGRATION_COMPLETE.md](MIGRATION_COMPLETE.md)** - Migration details
 
 ---
 
-<sub>🤫 Psst! [Strapi is hiring](https://strapi.io/careers).</sub>
+# 🚀 Saleor E-Commerce Platform - Quick Start
+
+This project implements a complete CI/CD automation system for testing and deploying **Saleor**, an open-source GraphQL-first e-commerce platform.
+
+## 🏗️ Technology Stack
+
+- **Backend:** Python 3.11, Django 4.2, GraphQL (Graphene-Django)
+- **Frontend:** React 18, Next.js 14, Apollo Client
+- **Database:** PostgreSQL 15
+- **Cache:** Redis 7
+- **Testing:** Pytest (backend), Jest (frontend), Cypress (E2E)
+- **CI/CD:** GitHub Actions, Jenkins, Docker
+
+## 🚀 Quick Start
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Run migrations
+docker-compose exec backend python manage.py migrate
+
+# Access the application
+# - Backend API: http://localhost:8000
+# - GraphQL Playground: http://localhost:8000/graphql/
+# - Storefront: http://localhost:3000
+```
+
+## 📚 Documentation
+
+For complete setup instructions, see **[README_SALEOR.md](README_SALEOR.md)**.
+
+## 🧪 Testing
+
+**Backend Tests:**
+```bash
+cd saleor
+pytest --cov=./ --cov-report=html
+```
+
+**Frontend Tests:**
+```bash
+cd saleor-storefront
+npm test
+```
+
+**E2E Tests:**
+```bash
+npx cypress run
+```
+
+## 🔄 CI/CD Pipeline
+
+The project includes:
+- ✅ GitHub Actions CI pipeline (lint, test, build, deploy)
+- ✅ Jenkins CD pipeline (staging deployment)
+- ✅ Docker containerization
+- ✅ Automated test execution
+
+See **[TEST_PLAN_SALEOR.md](TEST_PLAN_SALEOR.md)** for complete test plan.
+
+---
+
+**Note:** This project was migrated from Strapi. See [MIGRATION_COMPLETE.md](MIGRATION_COMPLETE.md) for migration details.
