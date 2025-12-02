@@ -224,7 +224,7 @@ jobs:
         run: |
           kill -9 $(cat strapi.pid) || true
 
-  # 4. Cypress (No Recording)
+  # 4. Cypress E2E Tests (with Cypress Cloud Recording)
   e2e:
     name: Cypress E2E Tests
     needs: integration-tests
@@ -351,14 +351,20 @@ jobs:
             echo "⚠️ Admin login page returned HTTP $HTTP_CODE (may need registration)"
           fi
 
-      - name: Run Cypress Tests (No Recording)
+      - name: Run Cypress Tests (with Cloud Recording)
+        # Note: To enable recording, add CYPRESS_RECORD_KEY to GitHub Secrets
+        # Get your record key from: https://cloud.cypress.io -> Project Settings -> Record Keys
         uses: cypress-io/github-action@v6
         with:
           browser: firefox
           config-file: cypress.config.js
+          record: ${{ secrets.CYPRESS_RECORD_KEY != '' }}
+          parallel: false
         env:
           CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
           CYPRESS_ADMIN_PASSWORD: ${{ secrets.CYPRESS_ADMIN_PASSWORD }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show Strapi Logs (E2E)
         if: failure()
