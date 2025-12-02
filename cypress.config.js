@@ -1,6 +1,9 @@
 const { defineConfig } = require('cypress');
 
 module.exports = defineConfig({
+  // Project ID for Cypress Cloud recording
+  projectId: '5vyah5',
+  
   e2e: {
     baseUrl: 'http://localhost:1337',
     supportFile: 'cypress/support/e2e.js',
