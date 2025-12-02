@@ -1,3 +1,8 @@
+# Saleor CI/CD Pipeline
+# Note: Linter warnings about "Context access might be invalid" for secrets.* are expected
+# and can be safely ignored. These warnings occur because the linter cannot verify that
+# secrets exist in the repository, but the workflow will work correctly when secrets are set.
+
 name: Saleor CI/CD Pipeline
 
 on:
@@ -70,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:${{ env.POSTGRES_VERSION }}
+        image: postgres:15
         env:
           POSTGRES_DB: saleor_test
           POSTGRES_USER: saleor
@@ -84,7 +89,7 @@ jobs:
           - 5432:5432
       
       redis:
-        image: redis:${{ env.REDIS_VERSION }}-alpine
+        image: redis:7-alpine
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -165,7 +170,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:${{ env.POSTGRES_VERSION }}
+        image: postgres:15
         env:
           POSTGRES_DB: saleor_test
           POSTGRES_USER: saleor
@@ -179,7 +184,7 @@ jobs:
           - 5432:5432
       
       redis:
-        image: redis:${{ env.REDIS_VERSION }}-alpine
+        image: redis:7-alpine
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
