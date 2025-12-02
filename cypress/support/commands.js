@@ -46,17 +46,17 @@ Cypress.Commands.add('login', (email, password) => {
         
         // Look for firstname and lastname fields (if they exist)
         cy.get('body').then(($body) => {
-          if ($body.find('input[name="firstname"], input[placeholder*="first" i]').length > 0) {
-            cy.get('input[name="firstname"], input[placeholder*="first" i]')
-              .first()
-              .clear()
-              .type('Haroon', { delay: 50 })
+          // Check for firstname field - try name attribute first, then placeholder
+          if ($body.find('input[name="firstname"]').length > 0) {
+            cy.get('input[name="firstname"]').first().clear().type('Haroon', { delay: 50 });
+          } else if ($body.find('input[placeholder*="first"], input[placeholder*="First"]').length > 0) {
+            cy.get('input[placeholder*="first"], input[placeholder*="First"]').first().clear().type('Haroon', { delay: 50 });
           }
-          if ($body.find('input[name="lastname"], input[placeholder*="last" i]').length > 0) {
-            cy.get('input[name="lastname"], input[placeholder*="last" i]')
-              .first()
-              .clear()
-              .type('Aziz', { delay: 50 })
+          // Check for lastname field
+          if ($body.find('input[name="lastname"]').length > 0) {
+            cy.get('input[name="lastname"]').first().clear().type('Aziz', { delay: 50 });
+          } else if ($body.find('input[placeholder*="last"], input[placeholder*="Last"]').length > 0) {
+            cy.get('input[placeholder*="last"], input[placeholder*="Last"]').first().clear().type('Aziz', { delay: 50 });
           }
           // Check for confirm password field
           if ($body.find('input[name="confirmPassword"]').length > 0) {

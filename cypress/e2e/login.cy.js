@@ -50,13 +50,13 @@ describe('Strapi Admin Authentication', () => {
       .should('exist')
       .and('be.visible');
     
-    // Email input - try multiple selectors
-    cy.get('input[type="email"], input[name="email"], input[placeholder*="email" i], input[placeholder*="@"]', { timeout: 15000 })
+    // Email input - try multiple selectors (removed invalid 'i' flag)
+    cy.get('input[type="email"], input[name="email"], input[placeholder*="email"], input[placeholder*="Email"], input[placeholder*="@"]', { timeout: 15000 })
       .should('be.visible')
       .first();
       
-    // Password input - try multiple selectors
-    cy.get('input[type="password"], input[name="password"], input[placeholder*="password" i]', { timeout: 15000 })
+    // Password input - try multiple selectors (removed invalid 'i' flag)
+    cy.get('input[type="password"], input[name="password"], input[placeholder*="password"], input[placeholder*="Password"]', { timeout: 15000 })
       .should('be.visible')
       .first();
       
@@ -66,7 +66,7 @@ describe('Strapi Admin Authentication', () => {
       .first();
   });
 
-  it('should show error message for invalid credentials', () => {
+  it('should show error message for invalid credentials', function() {
     // Wait to avoid rate limiting
     cy.wait(2000);
     
@@ -76,12 +76,11 @@ describe('Strapi Admin Authentication', () => {
     cy.get('body', { timeout: 30000 }).should('be.visible');
     cy.wait(1000);
     
-    // If we're on registration page, skip this test (admin doesn't exist yet)
+    // Check if we're on registration page - if so, skip this test
     cy.url().then((url) => {
       if (url.includes('/register-admin') || url.includes('/auth/register')) {
         cy.log('⚠️ On registration page - admin user may not exist. Skipping invalid credentials test.');
-        cy.skip();
-        return;
+        this.skip(); // Skip the test if on registration page
       }
     });
     
