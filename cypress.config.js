@@ -9,7 +9,7 @@ module.exports = defineConfig({
     supportFile: 'cypress/support/e2e.js',
     specPattern: 'cypress/e2e/**/*.cy.js',
     defaultCommandTimeout: 10000,
-    video: false,
+    video: true, // Enable video recording to see dashboard interactions
     screenshotOnRunFailure: true,
   },
   // Use Firefox as the default browser
