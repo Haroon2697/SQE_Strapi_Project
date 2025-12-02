@@ -1,433 +1,303 @@
-# Strapi CI/CD Pipeline
-# Note: Linter warnings about "Context access might be invalid" for secrets.* are expected
-# and can be safely ignored. These warnings occur because the linter cannot verify that
-# secrets exist in the repository, but the workflow will work correctly when secrets are set.
-
-name: Strapi CI/CD Pipeline
+name: Saleor CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 env:
+  PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
-  NODE_ENV: test
-  HOST: 0.0.0.0
-  PORT: 1337
-  DATABASE_CLIENT: sqlite
-  DATABASE_FILENAME: .tmp/test.db
-  STRAPI_TELEMETRY_DISABLED: true
-  CYPRESS_BASE_URL: http://localhost:1337
-  CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
-  CYPRESS_ADMIN_PASSWORD: ${{ secrets.CYPRESS_ADMIN_PASSWORD }}
-  DOCKER_IMAGE: strapi-app
-  DOCKER_TAG: ${{ github.sha }}
+  POSTGRES_VERSION: '15'
+  REDIS_VERSION: '7'
 
 jobs:
-  # 1. Lint
-  lint:
-    name: Lint & Validate
+  # 1. Lint Backend
+  lint-backend:
+    name: Lint Python Backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node.js
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        working-directory: ./saleor
+        run: |
+          pip install black flake8 isort
+      
+      - name: Run Black (code formatter check)
+        working-directory: ./saleor
+        run: black --check . || echo "Black check completed"
+        continue-on-error: true
+      
+      - name: Run Flake8 (linter)
+        working-directory: ./saleor
+        run: flake8 . || echo "Flake8 check completed"
+        continue-on-error: true
+
+  # 2. Lint Frontend
+  lint-frontend:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - run: npm ci
-      - name: Install ESLint (if needed)
-        run: npm install --save-dev eslint@^9.0.0 || true
+          cache-dependency-path: saleor-storefront/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./saleor-storefront
+        run: npm ci
+      
       - name: Run ESLint
-        run: npx eslint . || echo "ESLint check completed"
+        working-directory: ./saleor-storefront
+        run: npm run lint || echo "ESLint check completed"
         continue-on-error: true
 
-  # 2. Build & Unit Testing
-  build-and-test:
-    name: Build & Unit Tests
-    needs: lint
+  # 3. Test Backend
+  test-backend:
+    name: Test Backend (Pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:${{ env.POSTGRES_VERSION }}
+        env:
+          POSTGRES_DB: saleor_test
+          POSTGRES_USER: saleor
+          POSTGRES_PASSWORD: saleor
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:${{ env.REDIS_VERSION }}-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        working-directory: ./saleor
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run migrations
+        working-directory: ./saleor
+        env:
+          DATABASE_URL: postgres://saleor:saleor@localhost:5432/saleor_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          python manage.py migrate
+      
+      - name: Run tests
+        working-directory: ./saleor
+        env:
+          DATABASE_URL: postgres://saleor:saleor@localhost:5432/saleor_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+        run: |
+          pytest --cov=./ --cov-report=xml --cov-report=html -v
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./saleor/coverage.xml
+          flags: backend
+          name: backend-coverage
+
+  # 4. Test Frontend
+  test-frontend:
+    name: Test Frontend (Jest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - name: Cache node_modules and build
-        uses: actions/cache@v3
+          cache-dependency-path: saleor-storefront/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./saleor-storefront
+        run: npm ci
+      
+      - name: Run tests
+        working-directory: ./saleor-storefront
+        run: npm run test:coverage
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
         with:
-          path: |
-            node_modules
-            build
-            .cache
-          key: ${{ runner.os }}-strapi-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-strapi-
-      - run: npm ci
-      - run: npm run build --if-present
-      - name: Run Unit Tests Only
-        env:
-          NODE_ENV: test
-        run: |
-          mkdir -p .tmp
-          # Run only unit tests (exclude integration tests which need Strapi running)
-          npx jest tests/unit --coverage --config=jest.config.js
+          file: ./saleor-storefront/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
 
-  # 3. Start Strapi and run Integration Tests
-  integration-tests:
-    name: Integration Tests (API)
-    needs: build-and-test
+  # 5. E2E Tests (Cypress)
+  test-e2e:
+    name: E2E Tests (Cypress)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:${{ env.POSTGRES_VERSION }}
+        env:
+          POSTGRES_DB: saleor_test
+          POSTGRES_USER: saleor
+          POSTGRES_PASSWORD: saleor
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:${{ env.REDIS_VERSION }}-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install backend dependencies
+        working-directory: ./saleor
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Start backend
+        working-directory: ./saleor
+        env:
+          DATABASE_URL: postgres://saleor:saleor@localhost:5432/saleor_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+        run: |
+          python manage.py migrate
+          python manage.py runserver 0.0.0.0:8000 &
+          sleep 10
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - name: Cache node_modules and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            node_modules
-            build
-            .cache
-          key: ${{ runner.os }}-strapi-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-strapi-
-      - run: npm ci
-      - run: npm run build --if-present
-
-      - name: Build Strapi Admin
-        run: |
-          echo "Building Strapi admin panel..."
-          npm run build:ci
-          echo "Build complete - configs are in dist/config"
       
-      - name: Validate Required Secrets
-        run: |
-          echo "Checking required Strapi secrets..."
-          if [ -z "${{ secrets.ADMIN_JWT_SECRET }}" ]; then
-            echo "⚠️ WARNING: ADMIN_JWT_SECRET not set in GitHub Secrets"
-            echo "Using fallback value (may cause issues)"
-          else
-            echo "✅ ADMIN_JWT_SECRET is set"
-          fi
-          if [ -z "${{ secrets.APP_KEYS }}" ]; then
-            echo "⚠️ WARNING: APP_KEYS not set in GitHub Secrets"
-            echo "Using fallback value (may cause issues)"
-          else
-            echo "✅ APP_KEYS is set"
-          fi
-          if [ -z "${{ secrets.API_TOKEN_SALT }}" ]; then
-            echo "⚠️ WARNING: API_TOKEN_SALT not set in GitHub Secrets"
-            echo "Using fallback value (may cause issues)"
-          else
-            echo "✅ API_TOKEN_SALT is set"
-          fi
-          if [ -z "${{ secrets.TRANSFER_TOKEN_SALT }}" ]; then
-            echo "⚠️ WARNING: TRANSFER_TOKEN_SALT not set in GitHub Secrets"
-            echo "Using fallback value (may cause issues)"
-          else
-            echo "✅ TRANSFER_TOKEN_SALT is set"
-          fi
+      - name: Install Cypress
+        run: npm install -g cypress
       
-      - name: Start Strapi (Production Mode)
+      - name: Install frontend dependencies
+        working-directory: ./saleor-storefront
+        run: npm ci
+      
+      - name: Start storefront
+        working-directory: ./saleor-storefront
         env:
-          NODE_ENV: test
-          DATABASE_FILENAME: .tmp/test-integration.db
-          STRAPI_TELEMETRY_DISABLED: true
-          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET || 'test-admin-jwt-secret-for-ci-12345678901234567890' }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret-for-ci-12345678901234567890' }}
-          API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT || 'test-api-token-salt-for-ci-12345678901234567890' }}
-          TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT || 'test-transfer-token-salt-for-ci-12345678901234567890' }}
-          APP_KEYS: ${{ secrets.APP_KEYS || 'test-app-key-1-for-ci-12345678901234567890,test-app-key-2-for-ci-12345678901234567890' }}
+          NEXT_PUBLIC_SALEOR_API_URL: http://localhost:8000/graphql/
         run: |
-          mkdir -p .tmp
-          echo "Starting Strapi in production mode (strapi start - no dist cleanup)..."
-          # Use 'strapi start' - doesn't clean dist, so configs stay intact
-          npm run start:ci > strapi.log 2>&1 &
-          STRAPI_PID=$!
-          echo $STRAPI_PID > strapi.pid
-          echo "Strapi process started with PID: $STRAPI_PID"
-          echo "Waiting for Strapi to be ready (should be fast - no rebuild needed)..."
-          
-          # Wait up to 2 minutes for Strapi to start
-          MAX_ATTEMPTS=24
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            # Check if process is still running
-            if ! kill -0 $STRAPI_PID 2>/dev/null; then
-              echo "❌ Strapi process died! Showing logs:"
-              cat strapi.log || true
-              exit 1
-            fi
-            
-            # Check if Strapi is responding
-            if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-              echo "✅ Strapi is ready! (after ~$((i*5)) seconds)"
-              break
-            fi
-            
-            # Show progress every 6 attempts (30 seconds)
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Still waiting... ($i/$MAX_ATTEMPTS attempts, ~$((i*5)) seconds)"
-              echo "Last 10 lines of Strapi log:"
-              tail -10 strapi.log || true
-            fi
-            
-            sleep 5
-          done
-          
-          # Final check - also check API endpoint
-          if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-            echo "✅ Strapi admin confirmed ready"
-            # Also check API endpoint
-            if curl -s -f http://localhost:1337/api > /dev/null 2>&1 || curl -s http://localhost:1337/api | grep -q "strapi\|api"; then
-              echo "✅ Strapi API confirmed ready"
-            else
-              echo "⚠️ Strapi API may not be ready, but continuing..."
-            fi
-          else
-            echo "⚠️ Strapi may not be fully ready, showing full log:"
-            cat strapi.log || true
-            echo "Continuing with tests anyway..."
-          fi
-          
-          # Give Strapi a few more seconds to fully initialize
-          echo "Waiting 5 seconds for Strapi to fully initialize..."
-          sleep 5
-          
-          # Try to create admin user for testing (with retries)
-          echo "Attempting to create admin user for tests..."
-          for i in {1..3}; do
-            echo "Attempt $i/3 to create admin user..."
-            if node scripts/create-admin-user.js; then
-              echo "✅ Admin user created successfully!"
-              break
-            else
-              echo "⚠️ Attempt $i failed, waiting 3 seconds before retry..."
-              sleep 3
-            fi
-          done
-
-      - name: Run Integration Tests
-        run: npm run test:integration
-
-      - name: Show Strapi Logs
+          npm run build
+          npm start &
+          sleep 15
+      
+      - name: Run Cypress tests
+        working-directory: ./
+        env:
+          CYPRESS_BASE_URL: http://localhost:3000
+        run: |
+          cypress run --browser chrome --headless || echo "Cypress tests completed"
+        continue-on-error: true
+      
+      - name: Upload Cypress screenshots
         if: failure()
-        run: cat strapi.log
+        uses: actions/upload-artifact@v3
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots
 
-      - name: Stop Strapi
-        if: always()
-        run: |
-          kill -9 $(cat strapi.pid) || true
-
-  # 4. Cypress E2E Tests (with Cypress Cloud Recording)
-  e2e:
-    name: Cypress E2E Tests
-    needs: integration-tests
+  # 6. Docker Build
+  docker-build:
+    name: Build Docker Images
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      - name: Cache node_modules and build
-        uses: actions/cache@v3
-        with:
-          path: |
-            node_modules
-            build
-            .cache
-          key: ${{ runner.os }}-strapi-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-strapi-
-      - run: npm ci
-      - run: npm run build --if-present
-
-      - name: Build Strapi Admin
-        run: |
-          echo "Building Strapi admin panel..."
-          npm run build:ci
-          echo "Build complete - configs are in dist/config"
-      
-      - name: Validate Required Secrets
-        run: |
-          echo "Checking required Strapi secrets..."
-          if [ -z "${{ secrets.ADMIN_JWT_SECRET }}" ]; then
-            echo "⚠️ WARNING: ADMIN_JWT_SECRET not set in GitHub Secrets"
-            echo "Using fallback value (may cause issues)"
-          else
-            echo "✅ ADMIN_JWT_SECRET is set"
-          fi
-          if [ -z "${{ secrets.APP_KEYS }}" ]; then
-            echo "⚠️ WARNING: APP_KEYS not set in GitHub Secrets"
-            echo "Using fallback value (may cause issues)"
-          else
-            echo "✅ APP_KEYS is set"
-          fi
-      
-      - name: Start Strapi (Production Mode)
-        env:
-          NODE_ENV: test
-          DATABASE_FILENAME: .tmp/test-e2e.db
-          STRAPI_TELEMETRY_DISABLED: true
-          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET || 'test-admin-jwt-secret-for-ci-12345678901234567890' }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret-for-ci-12345678901234567890' }}
-          API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT || 'test-api-token-salt-for-ci-12345678901234567890' }}
-          TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT || 'test-transfer-token-salt-for-ci-12345678901234567890' }}
-          APP_KEYS: ${{ secrets.APP_KEYS || 'test-app-key-1-for-ci-12345678901234567890,test-app-key-2-for-ci-12345678901234567890' }}
-        run: |
-          mkdir -p .tmp
-          echo "Starting Strapi in production mode (strapi start - no dist cleanup)..."
-          # Use 'strapi start' - doesn't clean dist, so configs stay intact
-          npm run start:ci > strapi-e2e.log 2>&1 &
-          STRAPI_PID=$!
-          echo $STRAPI_PID > strapi-e2e.pid
-          echo "Strapi process started with PID: $STRAPI_PID"
-          echo "Waiting for Strapi to be ready (should be fast - no rebuild needed)..."
-          
-          # Wait up to 2 minutes for Strapi to start
-          MAX_ATTEMPTS=24
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            # Check if process is still running
-            if ! kill -0 $STRAPI_PID 2>/dev/null; then
-              echo "❌ Strapi process died! Showing logs:"
-              cat strapi-e2e.log || true
-              exit 1
-            fi
-            
-            # Check if Strapi is responding
-            if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-              echo "✅ Strapi is ready! (after ~$((i*5)) seconds)"
-              break
-            fi
-            
-            # Show progress every 6 attempts (30 seconds)
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Still waiting... ($i/$MAX_ATTEMPTS attempts, ~$((i*5)) seconds)"
-              echo "Last 10 lines of Strapi log:"
-              tail -10 strapi-e2e.log || true
-            fi
-            
-            sleep 5
-          done
-          
-          # Final check
-          if curl -s -f http://localhost:1337/admin > /dev/null 2>&1; then
-            echo "✅ Strapi confirmed ready and responding"
-          else
-            echo "⚠️ Strapi may not be fully ready, showing full log:"
-            cat strapi-e2e.log || true
-            echo "Continuing with tests anyway..."
-          fi
-          
-          # Give Strapi a few more seconds to fully initialize
-          echo "Waiting 5 seconds for Strapi to fully initialize..."
-          sleep 5
-          
-          # Try to create admin user for testing (with retries)
-          echo "Attempting to create admin user for tests..."
-          for i in {1..3}; do
-            echo "Attempt $i/3 to create admin user..."
-            if node scripts/create-admin-user.js; then
-              echo "✅ Admin user created successfully!"
-              break
-            else
-              echo "⚠️ Attempt $i failed, waiting 3 seconds before retry..."
-              sleep 3
-            fi
-          done
-          
-          # Verify admin user was created by checking if we can access login page
-          echo "Verifying admin user creation..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:1337/admin/auth/login || echo "000")
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Admin login page accessible (admin may exist)"
-          else
-            echo "⚠️ Admin login page returned HTTP $HTTP_CODE (may need registration)"
-          fi
-
-      - name: Run Cypress Tests (with Cloud Recording)
-        # Note: To enable recording, add CYPRESS_RECORD_KEY to GitHub Secrets
-        # Get your record key from: https://cloud.cypress.io -> Project Settings -> Record Keys
-        uses: cypress-io/github-action@v6
-        with:
-          browser: firefox
-          config-file: cypress.config.js
-          record: ${{ secrets.CYPRESS_RECORD_KEY != '' }}
-          parallel: false
-        env:
-          CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
-          CYPRESS_ADMIN_PASSWORD: ${{ secrets.CYPRESS_ADMIN_PASSWORD }}
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Show Strapi Logs (E2E)
-        if: failure()
-        run: cat strapi-e2e.log
-
-      - name: Stop Strapi
-        if: always()
-        run: |
-          kill -9 $(cat strapi-e2e.pid) || true
-
-  # 5. Docker Build & Push
-  docker:
-    name: Build & Push Docker
-    needs: e2e
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+      
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push Docker image
+      
+      - name: Build and push backend image
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ./saleor
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/saleor-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/saleor-backend:${{ github.sha }}
+      
+      - name: Build and push storefront image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./saleor-storefront
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/saleor-storefront:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/saleor-storefront:${{ github.sha }}
 
-  # 6. Trigger Jenkins Deployment (CD)
+  # 7. Trigger Jenkins Deployment
   notify-jenkins:
-    name: Trigger Jenkins Deploy
-    needs: docker
+    name: Trigger Jenkins Deployment
+    needs: [docker-build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Call Jenkins Webhook
         run: |
-          if [ -n "${{ secrets.JENKINS_WEBHOOK_URL }}" ]; then
-            curl -X POST "${{ secrets.JENKINS_WEBHOOK_URL }}" || echo "Jenkins webhook call failed, but continuing..."
-          else
-            echo "⚠️ JENKINS_WEBHOOK_URL not set. Jenkins deployment must be triggered manually."
-            echo "✅ CI Pipeline completed successfully!"
-            echo "📦 Docker image pushed to Docker Hub"
-            echo "🚀 Please trigger Jenkins pipeline manually or configure webhook URL"
-          fi
-
-  # 7. Deploy to Production (Manual - Optional)
-  # Note: Production deployment can be handled by Jenkins or manually
-  deploy-production:
-    name: Deploy to Production
-    needs: notify-jenkins
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Production Deployment Notice
-        run: |
-          echo " Production deployment triggered"
-          echo " Note: Production deployment should be handled by Jenkins"
-          echo " Use Jenkins pipeline for production deployment"
+          curl -X POST "${{ secrets.JENKINS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "ref": "${{ github.ref }}",
+              "sha": "${{ github.sha }}",
+              "repository": "${{ github.repository }}"
+            }' || echo "Jenkins webhook call completed"

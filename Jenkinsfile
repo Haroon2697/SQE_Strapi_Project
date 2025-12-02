@@ -1,88 +1,103 @@
-// Jenkins Pipeline for Continuous Deployment (CD)
-// This pipeline handles deployment after GitHub Actions completes CI
-// GitHub Actions: CI (Lint, Build, Test, Docker Build & Push)
-// Jenkins: CD (Deploy to Staging/Production)
-
 pipeline {
     agent any
-
+    
     environment {
-        // Docker configuration - Update with your Docker Hub username
-        DOCKER_IMAGE = credentials('dockerhub-username') + '/strapi-app:latest'
-        CONTAINER_NAME = 'strapi'
-        PORT = '1337'
+        DOCKER_IMAGE_BACKEND = "${DOCKERHUB_USERNAME}/saleor-backend:latest"
+        DOCKER_IMAGE_STOREFRONT = "${DOCKERHUB_USERNAME}/saleor-storefront:latest"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
     }
-
+    
     stages {
-        stage('Pull Latest Image') {
+        stage('Pull Latest Images') {
             steps {
                 script {
-                    echo "Pulling latest Docker image: ${DOCKER_IMAGE}"
-                    sh 'docker pull ${DOCKER_IMAGE}'
+                    sh '''
+                        echo "Pulling latest Docker images..."
+                        docker pull ${DOCKER_IMAGE_BACKEND} || true
+                        docker pull ${DOCKER_IMAGE_STOREFRONT} || true
+                    '''
                 }
             }
         }
-
-        stage('Stop Old Container') {
+        
+        stage('Stop Old Containers') {
             steps {
                 script {
-                    echo "Stopping and removing old container..."
-                    sh 'docker stop ${CONTAINER_NAME} || true'
-                    sh 'docker rm ${CONTAINER_NAME} || true'
+                    sh '''
+                        echo "Stopping old containers..."
+                        docker stop saleor-backend saleor-storefront || true
+                        docker rm saleor-backend saleor-storefront || true
+                    '''
                 }
             }
         }
-
+        
         stage('Deploy to Staging') {
             steps {
                 script {
-                    echo "Deploying to staging environment..."
                     sh '''
+                        echo "Deploying to staging..."
+                        
+                        # Start backend
                         docker run -d \
-                            -p ${PORT}:1337 \
-                            --name ${CONTAINER_NAME} \
-                            -e NODE_ENV=production \
-                            ${DOCKER_IMAGE}
+                            --name saleor-backend \
+                            -p 8000:8000 \
+                            --env-file .env.staging \
+                            ${DOCKER_IMAGE_BACKEND}
+                        
+                        # Start storefront
+                        docker run -d \
+                            --name saleor-storefront \
+                            -p 3000:3000 \
+                            -e NEXT_PUBLIC_SALEOR_API_URL=http://localhost:8000/graphql/ \
+                            ${DOCKER_IMAGE_STOREFRONT}
+                        
+                        echo "Waiting for services to be ready..."
+                        sleep 30
+                        
+                        # Health check
+                        curl -f http://localhost:8000/health || exit 1
+                        curl -f http://localhost:3000 || exit 1
                     '''
-                    echo "✅ Container ${CONTAINER_NAME} started"
                 }
             }
         }
-
-        stage('Health Check') {
+        
+        stage('Smoke Tests') {
             steps {
                 script {
-                    echo "Waiting for application to be ready..."
                     sh '''
-                        sleep 10
-                        for i in {1..10}; do
-                            if curl -f http://localhost:${PORT}/admin > /dev/null 2>&1; then
-                                echo "✅ Application is ready!"
-                                exit 0
-                            fi
-                            echo "Waiting... (attempt $i/10)"
-                            sleep 5
-                        done
-                        echo "⚠️ Health check timeout, but continuing..."
+                        echo "Running smoke tests..."
+                        # Test backend GraphQL endpoint
+                        curl -X POST http://localhost:8000/graphql/ \
+                            -H "Content-Type: application/json" \
+                            -d '{"query": "{ products(first: 1) { edges { node { id name } } } }"}' \
+                            || exit 1
+                        
+                        # Test storefront
+                        curl -f http://localhost:3000 || exit 1
                     '''
                 }
             }
         }
     }
-
+    
     post {
         success {
-            echo "✅ Deployed successfully to staging."
-            echo "Application available at: http://localhost:${PORT}/admin"
+            echo "Deployment to staging successful!"
+            emailext (
+                subject: "✅ Saleor Deployment Successful",
+                body: "Deployment to staging completed successfully.\n\nBuild: ${env.BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT}",
+                to: "${env.EMAIL_RECIPIENTS}"
+            )
         }
         failure {
-            echo "❌ Deployment failed. Check logs."
-            script {
-                sh 'docker logs ${CONTAINER_NAME} --tail 50 || true'
-            }
-        }
-        always {
-            echo "Deployment pipeline completed"
+            echo "Deployment to staging failed!"
+            emailext (
+                subject: "❌ Saleor Deployment Failed",
+                body: "Deployment to staging failed.\n\nBuild: ${env.BUILD_NUMBER}\nCommit: ${env.GIT_COMMIT}\n\nCheck Jenkins logs for details.",
+                to: "${env.EMAIL_RECIPIENTS}"
+            )
         }
     }
 }
